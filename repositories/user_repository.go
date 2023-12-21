@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"proteng-user-mgmt/database"
 	"proteng-user-mgmt/utils"
 
@@ -10,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserRepository interface {
@@ -78,7 +80,19 @@ func (ur *userRepository) Create(user *models.User) error {
 
 	_, err := ur.collection.InsertOne(context.Background(), user)
 	if err != nil {
+		if er, ok := err.(mongo.WriteException); ok && er.WriteErrors[0].Code == 11000 {
+			return errors.New("user with that email already exist")
+		}
 		return err
+	}
+
+	// Create a unique index for the email field
+	opt := options.Index()
+	opt.SetUnique(true)
+	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
+
+	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {
+		return errors.New("could not create index for email")
 	}
 
 	return nil

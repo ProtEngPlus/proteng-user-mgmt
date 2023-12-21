@@ -1,28 +1,40 @@
 package main
 
 import (
-	"log"
 	"os"
-
+	"proteng-user-mgmt/api/routes"
 	"proteng-user-mgmt/configs"
+	"proteng-user-mgmt/database"
+	"proteng-user-mgmt/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	configs.AutomaticLoadEnv()
 
-	r := gin.Default()
+	router := gin.Default()
 
-	// Health Check Endpoint
-	r.GET("/health", func(c *gin.Context) {
+	// database
+	err := database.ConnectToDB()
+	if err != nil {
+		logrus.Fatalf("Failed to connect to database: %v", err)
+	}
+	userRepository := repositories.NewUserRepository()
+
+	//health check
+	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "ok"})
 	})
 
-	// Start Server
+	// routes
+	routes.UserRoute(router, userRepository)
+
+	// start server
 	httpPort := os.Getenv("HTTP_PORT")
-	err := r.Run(":" + httpPort)
+	err = router.Run(":" + httpPort)
 	if err != nil {
-		log.Fatalf("Error starting server: %v", err)
+		logrus.Fatalf("Failed to start server: %v", err)
 	}
 }

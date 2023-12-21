@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"proteng-user-mgmt/database"
+	"proteng-user-mgmt/utils"
 
 	"proteng-user-mgmt/models"
 
@@ -71,6 +72,9 @@ func (ur *userRepository) FindById(id string) (*models.User, error) {
 
 func (ur *userRepository) Create(user *models.User) error {
 	user.Id = primitive.NewObjectID()
+
+	hashedPassword, _ := utils.HashPassword(user.Password)
+	user.Password = hashedPassword
 
 	_, err := ur.collection.InsertOne(context.Background(), user)
 	if err != nil {

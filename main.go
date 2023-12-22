@@ -30,6 +30,7 @@ func main() {
 
 	// routes
 	routes.UserRoute(router, userRepository)
+	routes.AuthRoute(router, userRepository)
 
 	// start server
 	httpPort := os.Getenv("HTTP_PORT")

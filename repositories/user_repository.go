@@ -20,6 +20,7 @@ type UserRepository interface {
 	Update(id string, user *models.User) error
 	Delete(id string) error
 	GetAll() ([]*models.User, error)
+	FindByEmail(email string) (*models.User, error)
 }
 
 type userRepository struct {
@@ -65,6 +66,18 @@ func (ur *userRepository) FindById(id string) (*models.User, error) {
 
 	var user models.User
 	err = ur.collection.FindOne(context.Background(), filter).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (ur *userRepository) FindByEmail(email string) (*models.User, error) {
+	filter := bson.M{"email": email}
+
+	var user models.User
+	err := ur.collection.FindOne(context.Background(), filter).Decode(&user)
 	if err != nil {
 		return nil, err
 	}

@@ -13,3 +13,8 @@ type User struct {
 	CitizenId string             `bson:"citizen_id" json:"citizen_id"`
 	Role      []string           `bson:"role" json:"role"`
 }
+
+type SignInInput struct {
+	Email    string `json:"email" bson:"email" binding:"required"`
+	Password string `json:"password" bson:"password" binding:"required"`
+}

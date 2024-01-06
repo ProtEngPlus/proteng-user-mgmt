@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"errors"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 
@@ -37,6 +39,12 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 			return
 		}
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
+		return
+	}
+
+	if !slices.Contains(user.Role, credentials.Role) {
+		err := errors.New("invalid role")
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
 

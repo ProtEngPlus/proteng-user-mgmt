@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"proteng-user-mgmt/models"
 	"proteng-user-mgmt/repositories"
 	"proteng-user-mgmt/utils"
+	"proteng-user-mgmt/utils/apiutil"
 )
 
 type AuthController struct {
@@ -22,48 +22,49 @@ func NewAuthController(userRepository repositories.UserRepository) *AuthControll
 	return &AuthController{userRepository: userRepository}
 }
 
-func (ac *AuthController) SignInUser(ctx *gin.Context) {
+func (ac *AuthController) SignInUser(c *gin.Context) {
 	var credentials *models.SignInInput
 
-	if err := ctx.ShouldBindJSON(&credentials); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+	if err := c.ShouldBindJSON(&credentials); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
 		return
 	}
 
 	user, err := ac.userRepository.FindByEmail(credentials.Email)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid email or password"})
+			apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 			return
 		}
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
 		return
 	}
 
 	if err := utils.VerifyPassword(user.Password, credentials.Password); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid email or Password"})
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
 
 	// Generate Tokens
 	duration, err := time.ParseDuration(os.Getenv("ACCESS_TOKEN_EXPIRED_IN"))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error parsing duration"})
+		apiutil.ApiResponseInternalServerError(c, err)
 		return // Return an error if parsing fails
 	}
 	accessToken, err := utils.CreateToken(duration, user.Id, os.Getenv("ACCESS_TOKEN_PRIVATE_KEY"))
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": err.Error()})
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
 
 	maxAge, err := strconv.Atoi(os.Getenv("ACCESS_TOKEN_MAXAGE"))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error parsing maxage"})
+		apiutil.ApiResponseInternalServerError(c, err)
 		return
 	}
-	ctx.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	ctx.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
+	c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
+	c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
 
-	ctx.JSON(http.StatusOK, gin.H{"access_token": accessToken, "user": user})
+	user.AccessToken = accessToken
+	apiutil.ApiResponseOk(c, user)
 }

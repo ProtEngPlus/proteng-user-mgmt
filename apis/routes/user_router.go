@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"proteng-user-mgmt/api/controllers"
+	"proteng-user-mgmt/apis/controllers"
 	"proteng-user-mgmt/repositories"
 
 	"github.com/gin-gonic/gin"

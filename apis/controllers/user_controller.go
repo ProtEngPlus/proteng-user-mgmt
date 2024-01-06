@@ -1,12 +1,11 @@
 package controllers
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 
 	"proteng-user-mgmt/models"
 	"proteng-user-mgmt/repositories"
+	"proteng-user-mgmt/utils/apiutil"
 )
 
 type UserController struct {
@@ -21,11 +20,11 @@ func NewUserController(userRepository repositories.UserRepository) *UserControll
 func (uc *UserController) GetAllUsers(c *gin.Context) {
 	users, err := uc.userRepository.GetAll()
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apiutil.ApiResponseInternalServerError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, users)
+	apiutil.ApiResponseOk(c, users)
 }
 
 // GetUser retrieves a user by ID
@@ -33,11 +32,11 @@ func (uc *UserController) GetUser(c *gin.Context) {
 	id := c.Param("id")
 	user, err := uc.userRepository.FindById(id)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apiutil.ApiResponseNotFound(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	apiutil.ApiResponseOk(c, user)
 }
 
 // CreateUser creates a new user
@@ -45,17 +44,17 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 	var user models.User
 	err := c.BindJSON(&user)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
 		return
 	}
 
 	err = uc.userRepository.Create(&user)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apiutil.ApiResponseInternalServerError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, user)
+	apiutil.ApiResponseOk(c, user)
 }
 
 // UpdateUser updates an existing user
@@ -63,22 +62,22 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 	id := c.Param("id")
 	user, err := uc.userRepository.FindById(id)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apiutil.ApiResponseNotFound(c, err)
 		return
 	}
 	err = c.BindJSON(&user)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
 		return
 	}
 
 	err = uc.userRepository.Update(id, user)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apiutil.ApiResponseInternalServerError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	apiutil.ApiResponseOk(c, user)
 }
 
 // DeleteUser deletes a user by ID
@@ -87,9 +86,9 @@ func (uc *UserController) DeleteUser(c *gin.Context) {
 
 	err := uc.userRepository.Delete(id)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apiutil.ApiResponseInternalServerError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
+	apiutil.ApiResponseOk(c, nil)
 }

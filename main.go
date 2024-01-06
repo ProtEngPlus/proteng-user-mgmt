@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"proteng-user-mgmt/api/routes"
+	"proteng-user-mgmt/apis/routes"
 	"proteng-user-mgmt/configs"
 	"proteng-user-mgmt/database"
 	"proteng-user-mgmt/repositories"

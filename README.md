@@ -40,7 +40,6 @@ building with docker will not bring the env file to the image. Instead, you will
 
 ```
 docker build -t proteng-user-mgmt .
-docker run -d --env_file=".env.dev" proteng-user-mgmt
-docker run -d --name user-mgmt  --env-file .env.dev proteng-user-mgmt
+docker run -d --name proteng-user-mgmt  --env-file .env.dev --network proteng-net -p 8081:8080 proteng-user-mgmt
 
 ```

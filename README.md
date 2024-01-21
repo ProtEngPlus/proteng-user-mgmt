@@ -27,7 +27,7 @@ Windows - CMD
 set ENV=dev && go run main.go
 ```
 
-Windows - Powershell
+Windows - Powershell 
 
 ```
 $Env:ENV = "dev" && go run main.go

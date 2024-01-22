@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       auto_deploy:
-        description: Wether to automatically deploy to devops-k8s
+        description: auto deploy to devops-k8s
         type: boolean
         default: false
 

@@ -47,7 +47,7 @@ jobs:
         with:
           owner: protengplus
           repo: devops-k8s
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.ACTIONS_AUTH_TOKEN }}
           workflow_file_name: update-tag.yaml
           client_payload: ${{ format("{{\"path\":{0},\"tag\":{1}}}", 'k8s/apps/user-mgmt/overlays/dev/kustomization.yaml', env.SHORT_SHA) }}
 

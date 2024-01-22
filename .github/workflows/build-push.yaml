@@ -2,6 +2,11 @@ name: Build and Publish
 
 on:
   workflow_dispatch:
+    inputs:
+      auto_deploy:
+        description: Wether to automatically deploy to devops-k8s
+        required: true
+        default: true
 
 jobs:
   build:
@@ -41,8 +46,17 @@ jobs:
           tags: ${{ secrets.IMAGE_REPO }}/${{ secrets.REGISTRY_USERNAME }}/proteng-user-mgmt:${{ env.SHORT_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Auto Deploy
+          
+  deploy:
+    name: Auto Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event.inputs.auto_deploy }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Auto Deploy to devops-k8s
         uses:  convictional/trigger-workflow-and-wait@v1.6.5
         with:
           owner: ProtEngPlus

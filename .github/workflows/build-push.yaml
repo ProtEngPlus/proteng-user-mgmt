@@ -5,8 +5,8 @@ on:
     inputs:
       auto_deploy:
         description: Wether to automatically deploy to devops-k8s
-        required: true
-        default: true
+        type: boolean
+        default: false
 
 jobs:
   build:

@@ -45,9 +45,10 @@ jobs:
       - name: Auto Deploy
         uses:  convictional/trigger-workflow-and-wait@v1.6.5
         with:
-          owner: protengplus
+          owner: ProtEngPlus
           repo: devops-k8s
           github_token: ${{ secrets.ACTIONS_AUTH_TOKEN }}
+          github_user: protenger
           workflow_file_name: update-tag.yaml
           client_payload: ${{ format('{{"path":{0},"tag":{1}}}', 'k8s/apps/user-mgmt/overlays/dev/kustomization.yaml', env.SHORT_SHA) }}
 

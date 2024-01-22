@@ -42,4 +42,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Auto Deploy
+        uses:  convictional/trigger-workflow-and-wait@v1.6.5
+        with:
+          owner: protengplus
+          repo: devops-k8s
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow_file_name: update-tag.yaml
+          client_payload: ${{ format("{{\"path\":{0},\"tag\":{1}}}", 'k8s/apps/user-mgmt/overlays/dev/kustomization.yaml', env.SHORT_SHA) }}
+
   

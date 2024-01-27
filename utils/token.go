@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
-func CreateToken(ttl time.Duration, payload interface{}, privateKey string) (string, error) {
+func CreateToken(ttl time.Duration, payload interface{}, role string, privateKey string) (string, error) {
 	decodedPrivateKey, err := base64.StdEncoding.DecodeString(privateKey)
 	if err != nil {
 		return "", fmt.Errorf("could not decode key: %w", err)
@@ -23,6 +23,7 @@ func CreateToken(ttl time.Duration, payload interface{}, privateKey string) (str
 
 	claims := make(jwt.MapClaims)
 	claims["sub"] = payload
+	claims["role"] = role
 	claims["exp"] = now.Add(ttl).Unix()
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
@@ -34,35 +35,4 @@ func CreateToken(ttl time.Duration, payload interface{}, privateKey string) (str
 	}
 
 	return token, nil
-}
-
-func ValidateToken(token string, publicKey string) (interface{}, error) {
-	decodedPublicKey, err := base64.StdEncoding.DecodeString(publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode: %w", err)
-	}
-
-	key, err := jwt.ParseRSAPublicKeyFromPEM(decodedPublicKey)
-
-	if err != nil {
-		return "", fmt.Errorf("validate: parse key: %w", err)
-	}
-
-	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected method: %s", t.Header["alg"])
-		}
-		return key, nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("validate: %w", err)
-	}
-
-	claims, ok := parsedToken.Claims.(jwt.MapClaims)
-	if !ok || !parsedToken.Valid {
-		return nil, fmt.Errorf("validate: invalid token")
-	}
-
-	return claims["sub"], nil
 }

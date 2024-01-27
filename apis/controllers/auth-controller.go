@@ -47,6 +47,7 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
+	user.Role = []string{credentials.Role}
 
 	if err := utils.VerifyPassword(user.Password, credentials.Password); err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
@@ -59,7 +60,7 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		apiutil.ApiResponseInternalServerError(c, err)
 		return // Return an error if parsing fails
 	}
-	accessToken, err := utils.CreateToken(duration, user.Id, os.Getenv("ACCESS_TOKEN_PRIVATE_KEY"))
+	accessToken, err := utils.CreateToken(duration, user.Id, credentials.Role, os.Getenv("ACCESS_TOKEN_PRIVATE_KEY"))
 	if err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return

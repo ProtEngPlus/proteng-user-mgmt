@@ -74,6 +74,9 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 	c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
 	c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
 
-	user.AccessToken = accessToken
-	apiutil.ApiResponseOk(c, user)
+	resp := models.FilteredResponse(user)
+	resp.AccessToken = accessToken
+	resp.CurrentRole = credentials.Role
+
+	apiutil.ApiResponseOk(c, resp)
 }

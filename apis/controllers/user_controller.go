@@ -24,7 +24,13 @@ func (uc *UserController) GetAllUsers(c *gin.Context) {
 		return
 	}
 
-	apiutil.ApiResponseOk(c, users)
+	// Transform each user using FilteredResponse function
+	var filteredUsers []models.UserResponse
+	for _, user := range users {
+		filteredUsers = append(filteredUsers, models.FilteredResponse(user))
+	}
+
+	apiutil.ApiResponseOk(c, filteredUsers)
 }
 
 // GetUser retrieves a user by ID
@@ -36,7 +42,7 @@ func (uc *UserController) GetUser(c *gin.Context) {
 		return
 	}
 
-	apiutil.ApiResponseOk(c, user)
+	apiutil.ApiResponseOk(c, models.FilteredResponse(user))
 }
 
 // CreateUser creates a new user
@@ -54,7 +60,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	apiutil.ApiResponseOk(c, user)
+	apiutil.ApiResponseOk(c, models.FilteredResponse(&user))
 }
 
 // UpdateUser updates an existing user
@@ -77,7 +83,7 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	apiutil.ApiResponseOk(c, user)
+	apiutil.ApiResponseOk(c, models.FilteredResponse(user))
 }
 
 // DeleteUser deletes a user by ID

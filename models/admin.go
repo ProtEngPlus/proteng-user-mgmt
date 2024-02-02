@@ -18,6 +18,11 @@ type AdminResponse struct {
 	AccessToken string             `json:"access_token,omitempty"`
 }
 
+type SignInAdminInput struct {
+	Email    string `json:"email" bson:"email" binding:"required"`
+	Password string `json:"password" bson:"password" binding:"required"`
+}
+
 func FilteredAdminResponse(admin *Admin) AdminResponse {
 	return AdminResponse{
 		ID:       admin.Id,

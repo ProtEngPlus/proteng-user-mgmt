@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,11 +16,12 @@ import (
 )
 
 type AuthController struct {
-	userRepository repositories.UserRepository
+	userRepository  repositories.UserRepository
+	adminRepository repositories.AdminRepository
 }
 
-func NewAuthController(userRepository repositories.UserRepository) *AuthController {
-	return &AuthController{userRepository: userRepository}
+func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository) *AuthController {
+	return &AuthController{userRepository: userRepository, adminRepository: adminRepository}
 }
 
 func (ac *AuthController) SignInUser(c *gin.Context) {
@@ -47,7 +47,6 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
-	user.Role = []string{credentials.Role}
 
 	if err := utils.VerifyPassword(user.Password, credentials.Password); err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
@@ -66,17 +65,66 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		return
 	}
 
-	maxAge, err := strconv.Atoi(os.Getenv("ACCESS_TOKEN_MAXAGE"))
-	if err != nil {
-		apiutil.ApiResponseInternalServerError(c, err)
-		return
-	}
-	c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
+	// maxAge, err := strconv.Atoi(os.Getenv("ACCESS_TOKEN_MAXAGE"))
+	// if err != nil {
+	// 	apiutil.ApiResponseInternalServerError(c, err)
+	// 	return
+	// }
+	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
+	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
 
 	resp := models.FilteredResponse(user)
 	resp.AccessToken = accessToken
 	resp.CurrentRole = credentials.Role
+
+	apiutil.ApiResponseOk(c, resp)
+}
+
+func (ac *AuthController) SignInAdmin(c *gin.Context) {
+	var credentials *models.SignInAdminInput
+
+	if err := c.ShouldBindJSON(&credentials); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
+		return
+	}
+
+	admin, err := ac.adminRepository.FindByEmail(credentials.Email)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
+			return
+		}
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
+		return
+	}
+
+	if err := utils.VerifyPassword(admin.Password, credentials.Password); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
+		return
+	}
+
+	// Generate Tokens
+	duration, err := time.ParseDuration(os.Getenv("ACCESS_TOKEN_EXPIRED_IN"))
+	if err != nil {
+		apiutil.ApiResponseInternalServerError(c, err)
+		return // Return an error if parsing fails
+	}
+	accessToken, err := utils.CreateToken(duration, admin.Id, "admin", os.Getenv("ACCESS_TOKEN_PRIVATE_KEY"))
+	if err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
+		return
+	}
+
+	// maxAge, err := strconv.Atoi(os.Getenv("ACCESS_TOKEN_MAXAGE"))
+	// if err != nil {
+	// 	apiutil.ApiResponseInternalServerError(c, err)
+	// 	return
+	// }
+	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
+	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
+
+	resp := models.FilteredAdminResponse(admin)
+	resp.AccessToken = accessToken
 
 	apiutil.ApiResponseOk(c, resp)
 }

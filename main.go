@@ -31,7 +31,7 @@ func main() {
 
 	// routes
 	routes.UserRoute(router, userRepository)
-	routes.AuthRoute(router, userRepository)
+	routes.AuthRoute(router, userRepository, adminRepository)
 	routes.AdminRoute(router, adminRepository)
 
 	// start server

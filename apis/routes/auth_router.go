@@ -7,8 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthRoute(router *gin.Engine, ur repositories.UserRepository) {
-	ac := controllers.NewAuthController(ur)
+func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository) {
+	ac := controllers.NewAuthController(ur, ar)
 
 	router.POST("/auth/login", ac.SignInUser)
+	router.POST("/auth/login/admin", ac.SignInAdmin)
 }

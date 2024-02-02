@@ -22,6 +22,7 @@ func main() {
 		logrus.Fatalf("Failed to connect to database: %v", err)
 	}
 	userRepository := repositories.NewUserRepository()
+	adminRepository := repositories.NewAdminRepository()
 
 	//health check
 	router.GET("/health", func(c *gin.Context) {
@@ -31,6 +32,7 @@ func main() {
 	// routes
 	routes.UserRoute(router, userRepository)
 	routes.AuthRoute(router, userRepository)
+	routes.AdminRoute(router, adminRepository)
 
 	// start server
 	httpPort := os.Getenv("HTTP_PORT")

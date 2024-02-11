@@ -3,9 +3,9 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 
-	"proteng-user-mgmt/models"
-	"proteng-user-mgmt/repositories"
-	"proteng-user-mgmt/utils/apiutil"
+	"github.com/protengplus/proteng-user-mgmt/models"
+	"github.com/protengplus/proteng-user-mgmt/repositories"
+	"github.com/protengplus/proteng-user-mgmt/utils/apiutil"
 )
 
 type AdminController struct {

@@ -3,7 +3,7 @@ package apiutil
 import (
 	"net/http"
 
-	"proteng-user-mgmt/models"
+	"github.com/protengplus/proteng-user-mgmt/models"
 
 	"github.com/gin-gonic/gin"
 )

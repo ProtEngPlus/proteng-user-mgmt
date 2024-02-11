@@ -3,10 +3,10 @@ package repositories
 import (
 	"context"
 	"errors"
-	"proteng-user-mgmt/database"
-	"proteng-user-mgmt/utils"
+	"github.com/protengplus/proteng-user-mgmt/database"
+	"github.com/protengplus/proteng-user-mgmt/utils"
 
-	"proteng-user-mgmt/models"
+	"github.com/protengplus/proteng-user-mgmt/models"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

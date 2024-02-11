@@ -1,20 +1,25 @@
 package main
 
 import (
-	"os"
-	"proteng-user-mgmt/apis/routes"
-	"proteng-user-mgmt/configs"
-	"proteng-user-mgmt/database"
-	"proteng-user-mgmt/repositories"
+	"time"
 
+	"github.com/protengplus/proteng-user-mgmt/apis/routes"
+	"github.com/protengplus/proteng-user-mgmt/configs"
+	"github.com/protengplus/proteng-user-mgmt/database"
+	"github.com/protengplus/proteng-user-mgmt/internal/logger"
+	"github.com/protengplus/proteng-user-mgmt/repositories"
+
+	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
+	logger.InitZap()
 	configs.AutomaticLoadEnv()
 
-	router := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
 
 	// database
 	err := database.ConnectToDB()
@@ -23,6 +28,13 @@ func main() {
 	}
 	userRepository := repositories.NewUserRepository()
 	adminRepository := repositories.NewAdminRepository()
+
+	// logging middleware
+	router.Use(ginzap.GinzapWithConfig(logger.Zap, &ginzap.Config{
+		TimeFormat: time.RFC3339,
+		UTC:        true,
+		SkipPaths:  []string{"/metrics", "/health"},
+	}))
 
 	//health check
 	router.GET("/health", func(c *gin.Context) {
@@ -34,8 +46,11 @@ func main() {
 	routes.AuthRoute(router, userRepository, adminRepository)
 	routes.AdminRoute(router, adminRepository)
 
+	// panic recovery
+	router.Use(ginzap.RecoveryWithZap(logger.Zap, true))
+
 	// start server
-	httpPort := os.Getenv("HTTP_PORT")
+	httpPort := configs.Config.HttpPort
 	err = router.Run(":" + httpPort)
 	if err != nil {
 		logrus.Fatalf("Failed to start server: %v", err)

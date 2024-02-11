@@ -2,17 +2,17 @@ package controllers
 
 import (
 	"errors"
-	"os"
 	"slices"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"proteng-user-mgmt/models"
-	"proteng-user-mgmt/repositories"
-	"proteng-user-mgmt/utils"
-	"proteng-user-mgmt/utils/apiutil"
+	"github.com/protengplus/proteng-user-mgmt/configs"
+	"github.com/protengplus/proteng-user-mgmt/models"
+	"github.com/protengplus/proteng-user-mgmt/repositories"
+	"github.com/protengplus/proteng-user-mgmt/utils"
+	"github.com/protengplus/proteng-user-mgmt/utils/apiutil"
 )
 
 type AuthController struct {
@@ -54,18 +54,18 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 	}
 
 	// Generate Tokens
-	duration, err := time.ParseDuration(os.Getenv("ACCESS_TOKEN_EXPIRED_IN"))
+	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
 	if err != nil {
 		apiutil.ApiResponseInternalServerError(c, err)
 		return // Return an error if parsing fails
 	}
-	accessToken, err := utils.CreateToken(duration, user.Id, credentials.Role, os.Getenv("ACCESS_TOKEN_PRIVATE_KEY"))
+	accessToken, err := utils.CreateToken(duration, user.Id, credentials.Role, configs.Config.AccessTokenPrivateKey)
 	if err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
 
-	// maxAge, err := strconv.Atoi(os.Getenv("ACCESS_TOKEN_MAXAGE"))
+	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
 	// if err != nil {
 	// 	apiutil.ApiResponseInternalServerError(c, err)
 	// 	return
@@ -104,18 +104,18 @@ func (ac *AuthController) SignInAdmin(c *gin.Context) {
 	}
 
 	// Generate Tokens
-	duration, err := time.ParseDuration(os.Getenv("ACCESS_TOKEN_EXPIRED_IN"))
+	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
 	if err != nil {
 		apiutil.ApiResponseInternalServerError(c, err)
 		return // Return an error if parsing fails
 	}
-	accessToken, err := utils.CreateToken(duration, admin.Id, "admin", os.Getenv("ACCESS_TOKEN_PRIVATE_KEY"))
+	accessToken, err := utils.CreateToken(duration, admin.Id, "admin", configs.Config.AccessTokenPrivateKey)
 	if err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
 
-	// maxAge, err := strconv.Atoi(os.Getenv("ACCESS_TOKEN_MAXAGE"))
+	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
 	// if err != nil {
 	// 	apiutil.ApiResponseInternalServerError(c, err)
 	// 	return

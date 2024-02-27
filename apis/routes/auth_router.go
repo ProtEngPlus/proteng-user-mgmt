@@ -12,4 +12,7 @@ func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositori
 
 	router.POST("/auth/login", ac.SignInUser)
 	router.POST("/auth/login/admin", ac.SignInAdmin)
+	router.POST("/auth/forgotpassword", ac.ForgotPassword)
+	router.PATCH("/auth/resetpassword/:resetToken", ac.ResetPassword)
+
 }

@@ -21,6 +21,13 @@ type config struct {
 
 	MongoUri string `envconfig:"MONGO_URI" default:""`
 	MongoDb  string `envconfig:"MONGO_DB" default:"proteng-dev"`
+
+	EmailFrom string `envconfig:"EMAIL_FROM" default:"proteng.plus@gmail.com"`
+	SMTPHost  string `envconfig:"SMTP_HOST"`
+	SMTPPass  string `envconfig:"SMTP_PASS"`
+	SMTPPort  int    `envconfig:"SMTP_PORT"`
+	SMTPUser  string `envconfig:"SMTP_USER"`
+	Origin    string `envconfig:"ORIGIN"`
 }
 
 // LoadConfig loads the config from the .env file if the ENV variable is set

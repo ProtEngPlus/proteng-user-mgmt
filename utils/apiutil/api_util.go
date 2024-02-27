@@ -51,3 +51,25 @@ func ApiResponseNotFound(c *gin.Context, err error, messages ...string) {
 		Message: messages[0],
 	})
 }
+
+func ApiResponseForbidden(c *gin.Context, err error, messages ...string) {
+	if len(messages) == 0 {
+		messages = append(messages, "")
+	}
+	c.AbortWithStatusJSON(http.StatusForbidden, models.HttpResponseError{
+		Code:    http.StatusForbidden,
+		Error:   err.Error(),
+		Message: messages[0],
+	})
+}
+
+func ApiResponseBadGateway(c *gin.Context, err error, messages ...string) {
+	if len(messages) == 0 {
+		messages = append(messages, "")
+	}
+	c.AbortWithStatusJSON(http.StatusBadGateway, models.HttpResponseError{
+		Code:    http.StatusBadGateway,
+		Error:   err.Error(),
+		Message: messages[0],
+	})
+}

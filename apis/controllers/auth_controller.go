@@ -193,7 +193,7 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 		Subject:   "Your password reset token (valid for 10 minutes)",
 	}
 
-	temp := template.Must(template.ParseGlob("templates/*.html"))
+	temp := template.Must(template.ParseGlob("../templates/*.html"))
 
 	err = utils.SendEmail(user, &emailData, temp, "resetPassword.html")
 	if err != nil {

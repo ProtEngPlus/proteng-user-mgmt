@@ -1,14 +1,16 @@
 package routes
 
 import (
+	"html/template"
+
 	"github.com/protengplus/proteng-user-mgmt/apis/controllers"
 	"github.com/protengplus/proteng-user-mgmt/repositories"
 
 	"github.com/gin-gonic/gin"
 )
 
-func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository) {
-	ac := controllers.NewAuthController(ur, ar)
+func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository, temp *template.Template) {
+	ac := controllers.NewAuthController(ur, ar, temp)
 
 	router.POST("/auth/login", ac.SignInUser)
 	router.POST("/auth/login/admin", ac.SignInAdmin)

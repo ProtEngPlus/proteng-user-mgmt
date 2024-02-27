@@ -26,13 +26,15 @@ type AuthController struct {
 	userRepository  repositories.UserRepository
 	adminRepository repositories.AdminRepository
 	collection      *mongo.Collection
+	temp            *template.Template
 }
 
-func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository) *AuthController {
+func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository, temp *template.Template) *AuthController {
 	return &AuthController{
 		userRepository:  userRepository,
 		adminRepository: adminRepository,
 		collection:      database.GetCollection("users"),
+		temp:            temp,
 	}
 }
 
@@ -193,9 +195,7 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 		Subject:   "Your password reset token (valid for 10 minutes)",
 	}
 
-	temp := template.Must(template.ParseGlob("../templates/*.html"))
-
-	err = utils.SendEmail(user, &emailData, temp, "resetPassword.html")
+	err = utils.SendEmail(user, &emailData, ac.temp, "resetPassword.html")
 	if err != nil {
 		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
 		return

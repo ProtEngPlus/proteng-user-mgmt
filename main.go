@@ -1,6 +1,7 @@
 package main
 
 import (
+	"html/template"
 	"time"
 
 	"github.com/protengplus/proteng-user-mgmt/apis/routes"
@@ -28,6 +29,7 @@ func main() {
 	}
 	userRepository := repositories.NewUserRepository()
 	adminRepository := repositories.NewAdminRepository()
+	temp := template.Must(template.ParseGlob("templates/*.html"))
 
 	// logging middleware
 	router.Use(ginzap.GinzapWithConfig(logger.Zap, &ginzap.Config{
@@ -43,7 +45,7 @@ func main() {
 
 	// routes
 	routes.UserRoute(router, userRepository)
-	routes.AuthRoute(router, userRepository, adminRepository)
+	routes.AuthRoute(router, userRepository, adminRepository, temp)
 	routes.AdminRoute(router, adminRepository)
 
 	// panic recovery

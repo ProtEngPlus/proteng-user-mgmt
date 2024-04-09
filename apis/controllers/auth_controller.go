@@ -190,7 +190,7 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 
 	// Send Email
 	emailData := utils.EmailData{
-		URL:       configs.Config.Origin + "/reset-password/?token=" + resetToken,
+		URL:       configs.Config.Origin + "/reset-password?token=" + resetToken,
 		FirstName: firstName,
 		Subject:   "Your password reset token (valid for 10 minutes)",
 	}

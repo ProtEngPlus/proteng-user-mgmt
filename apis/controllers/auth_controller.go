@@ -356,5 +356,29 @@ func (ac *AuthController) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	apiutil.ApiResponseOk(c, nil, "Email verified successfully")
+	// Find user
+	var user models.User
+	err = ac.collection.FindOne(context.Background(), query).Decode(&user)
+	if err != nil {
+		apiutil.ApiResponseForbidden(c, err)
+		return
+	}
+
+	// Generate Tokens
+	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
+	if err != nil {
+		apiutil.ApiResponseInternalServerError(c, err)
+		return // Return an error if parsing fails
+	}
+	accessToken, err := utils.CreateToken(duration, user.Id, "user", configs.Config.AccessTokenPrivateKey)
+	if err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
+		return
+	}
+
+	resp := models.FilteredResponse(&user)
+	resp.AccessToken = accessToken
+	resp.CurrentRole = "user"
+
+	apiutil.ApiResponseOk(c, resp, "Email verified successfully")
 }

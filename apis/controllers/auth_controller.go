@@ -237,3 +237,42 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 
 	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")
 }
+
+func (ac *AuthController) ChangePassword(c *gin.Context) {
+	id := c.Param("id")
+	user, err := ac.userRepository.FindById(id)
+	if err != nil {
+		apiutil.ApiResponseNotFound(c, err)
+		return
+	}
+	var userCredential *models.ChangePasswordInput
+	if err := c.ShouldBindJSON(&userCredential); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
+		return
+	}
+
+	// Validate Current Password
+	if err := utils.VerifyPassword(user.Password, userCredential.CurrentPassword); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: incorrect current password")
+		return
+	}
+
+	// Update User in Database
+	hashedPassword, _ := utils.HashPassword(userCredential.NewPassword)
+
+	query := bson.D{{Key: "email", Value: user.Email}}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}}
+	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseErrorBadRequest(c, err, "Cannot update password")
+		return
+	}
+
+	if err != nil {
+		apiutil.ApiResponseForbidden(c, err)
+		return
+	}
+
+	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")
+}

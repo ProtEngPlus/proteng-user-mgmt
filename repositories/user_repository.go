@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+
 	"github.com/protengplus/proteng-user-mgmt/database"
 	"github.com/protengplus/proteng-user-mgmt/utils"
 
@@ -120,12 +121,12 @@ func (ur *userRepository) Update(id string, user *models.User) error {
 
 	update := bson.M{
 		"$set": bson.M{
-			"email":      user.Email,
-			"password":   user.Password,
-			"citizen_id": user.CitizenId,
-			"name":       user.Name,
-			"surname":    user.Surname,
-			"role":       user.Role,
+			"email":     user.Email,
+			"password":  user.Password,
+			"name":      user.Name,
+			"surname":   user.Surname,
+			"role":      user.Role,
+			"user_role": user.UserRole,
 		},
 	}
 

@@ -121,12 +121,13 @@ func (ur *userRepository) Update(id string, user *models.User) error {
 
 	update := bson.M{
 		"$set": bson.M{
-			"email":     user.Email,
-			"password":  user.Password,
-			"name":      user.Name,
-			"surname":   user.Surname,
-			"role":      user.Role,
-			"user_role": user.UserRole,
+			"email":       user.Email,
+			"password":    user.Password,
+			"name":        user.Name,
+			"surname":     user.Surname,
+			"role":        user.Role,
+			"user_role":   user.UserRole,
+			"is_verified": user.IsVerified,
 		},
 	}
 

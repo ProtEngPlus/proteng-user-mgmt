@@ -17,5 +17,6 @@ func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositori
 	router.POST("/auth/forgotpassword", ac.ForgotPassword)
 	router.PATCH("/auth/resetpassword/:resetToken", ac.ResetPassword)
 	router.PATCH("/auth/changepassword/:id", ac.ChangePassword)
-
+	router.POST("/auth/sentverification", ac.SendVerification)
+	router.POST("/auth/verifyemail/:verificationToken", ac.VerifyEmail)
 }

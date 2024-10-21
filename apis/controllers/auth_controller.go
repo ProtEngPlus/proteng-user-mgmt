@@ -276,3 +276,85 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 
 	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")
 }
+
+func (ac *AuthController) SendVerification(c *gin.Context) {
+	var userCredential *models.SendVerificationInput
+
+	if err := c.ShouldBindJSON(&userCredential); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
+		return
+	}
+
+	message := "You will receive a verification email if user with that email exist"
+
+	user, err := ac.userRepository.FindByEmail(userCredential.Email)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			apiutil.ApiResponseOk(c, userCredential, message)
+			return
+		}
+		apiutil.ApiResponseBadGateway(c, err)
+		return
+	}
+
+	// Generate Verification Code
+	verificationToken := randstr.String(20)
+
+	emailVerificationToken := utils.Encode(verificationToken)
+
+	// Update User in Database
+	query := bson.D{{Key: "email", Value: strings.ToLower(userCredential.Email)}}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "emailVerificationToken", Value: emailVerificationToken}, {Key: "emailVerificationTokenExpire", Value: time.Now().Add(time.Hour * 168)}}}}
+	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
+		return
+	}
+
+	if err != nil {
+		apiutil.ApiResponseForbidden(c, err)
+		return
+	}
+	var firstName = user.Name
+
+	if strings.Contains(firstName, " ") {
+		firstName = strings.Split(firstName, " ")[1]
+	}
+
+	// Send Email
+	emailData := utils.EmailData{
+		URL:       configs.Config.Origin + "/auth/verifyemail/" + verificationToken,
+		FirstName: firstName,
+		Subject:   "Your email verification token (valid for 7 days)",
+	}
+
+	err = utils.SendEmail(user, &emailData, ac.temp, "verificationEmail.html")
+	if err != nil {
+		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
+		return
+	}
+	apiutil.ApiResponseOk(c, userCredential, message)
+}
+
+func (ac *AuthController) VerifyEmail(c *gin.Context) {
+	verificationToken := c.Params.ByName("verificationToken")
+	emailVerificationToken := utils.Encode(verificationToken)
+
+	// Update User in Database
+	query := bson.D{{Key: "emailVerificationToken", Value: emailVerificationToken}, {Key: "emailVerificationTokenExpire", Value: bson.D{{Key: "$gt", Value: time.Now()}}}}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "is_verified", Value: true}}}}
+	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseErrorBadRequest(c, fmt.Errorf("invalid token"), "Token is invalid or has expired")
+		return
+	}
+
+	if err != nil {
+		apiutil.ApiResponseForbidden(c, err)
+		return
+	}
+
+	apiutil.ApiResponseOk(c, nil, "Email verified successfully")
+}

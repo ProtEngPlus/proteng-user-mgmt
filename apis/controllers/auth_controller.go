@@ -67,6 +67,12 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		return
 	}
 
+	if !user.IsVerified {
+		err := errors.New("email not verified")
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: email not verified")
+		return
+	}
+
 	// Generate Tokens
 	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
 	if err != nil {
@@ -160,6 +166,12 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 			return
 		}
 		apiutil.ApiResponseBadGateway(c, err)
+		return
+	}
+
+	if !user.IsVerified {
+		err := errors.New("email not verified")
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: email not verified")
 		return
 	}
 

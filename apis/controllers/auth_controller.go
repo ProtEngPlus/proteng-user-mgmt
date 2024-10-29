@@ -336,7 +336,7 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 
 	// Send Email
 	emailData := utils.EmailData{
-		URL:       configs.Config.Origin + "/auth/verifyemail/" + verificationToken,
+		URL:       configs.Config.Origin + "/success-verified?token=" + verificationToken,
 		FirstName: firstName,
 		Subject:   "Your email verification token (valid for 7 days)",
 	}

@@ -341,7 +341,7 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 		Subject:   "Your email verification token (valid for 7 days)",
 	}
 
-	err = utils.SendEmail(user, &emailData, ac.temp, "verificationEmail.html")
+	err = utils.SendEmail(user, &emailData, ac.temp, "verificationEmail")
 	if err != nil {
 		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
 		return

@@ -1,0 +1,22 @@
+{{template "base" .}} {{define "jobStatusNotification"}}
+<table role="presentation" class="main">
+  <!-- START MAIN CONTENT AREA -->
+  <tr>
+    <td class="wrapper">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td>
+            <p>Hi {{ .FirstName}},</p>
+            <p>
+              Your job is either fully completed or completed up to the stage you have run. Please log in to
+              check.<br />
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- END MAIN CONTENT AREA -->
+</table>
+{{end}}

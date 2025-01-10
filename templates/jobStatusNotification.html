@@ -8,7 +8,7 @@
           <td>
             <p>Hi {{ .FirstName}},</p>
             <p>
-              Your job is either fully completed or completed up to the stage you have run. Please log in to
+              Your job "{{ .JobName}}" is {{ .JobState}} on stage {{ .StageID}}: {{ .StageName}}. Please log in to
               check.<br />
             </p>
           </td>

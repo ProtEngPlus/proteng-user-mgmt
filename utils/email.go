@@ -17,6 +17,10 @@ type EmailData struct {
 	URL       string
 	FirstName string
 	Subject   string
+	JobName   string
+	JobState  string
+	StageID   string
+	StageName string
 }
 
 // 👇 Email template parser

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+
+	rmqConsumer "github.com/protengplus/proteng-user-mgmt/internal/rabbitmq/consumer"
 )
 
 func main() {
@@ -30,6 +33,21 @@ func main() {
 	userRepository := repositories.NewUserRepository()
 	adminRepository := repositories.NewAdminRepository()
 	temp := template.Must(template.ParseGlob("templates/*.html"))
+
+	// rabbitmq
+	rabbitConsumer := rmqConsumer.NewConsumer(userRepository, temp)
+
+	rabbitMqUser := configs.Config.RabbitMqUser
+	rabbitMqPassword := configs.Config.RabbitMqPassword
+	rabbitMqHost := configs.Config.RabbitMqHost
+	rabbitMqPort := configs.Config.RabbitMqPort
+	amqpURL := fmt.Sprintf("amqp://%s:%s@%s:%s/", rabbitMqUser, rabbitMqPassword, rabbitMqHost, rabbitMqPort)
+	go func() {
+		err := rabbitConsumer.RunConsumer(amqpURL, configs.Config.JobQueue)
+		if err != nil {
+			logger.Fatalf("Error in RabbitMQ Consumer: %v", err)
+		}
+	}()
 
 	// logging middleware
 	router.Use(ginzap.GinzapWithConfig(logger.Zap, &ginzap.Config{

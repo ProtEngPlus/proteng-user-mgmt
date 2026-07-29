@@ -29,11 +29,8 @@ type config struct {
 	SMTPUser  string `envconfig:"SMTP_USER"`
 	Origin    string `envconfig:"ORIGIN"`
 
-	RabbitMqUser     string `envconfig:"RABBITMQ_USER"`
-	RabbitMqPassword string `envconfig:"RABBITMQ_PASSWORD"`
-	RabbitMqHost     string `envconfig:"RABBITMQ_HOST"`
-	RabbitMqPort     string `envconfig:"RABBITMQ_PORT"`
-	JobQueue         string `envconfig:"JOB_QUEUE"`
+	RabbitMqUrl string `envconfig:"RABBITMQ_URL"`
+	JobQueue    string `envconfig:"JOB_QUEUE"`
 }
 
 // LoadConfig loads the config from the .env file if the ENV variable is set

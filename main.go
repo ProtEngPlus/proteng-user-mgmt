@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"time"
 
@@ -37,11 +36,7 @@ func main() {
 	// rabbitmq
 	rabbitConsumer := rmqConsumer.NewConsumer(userRepository, temp)
 
-	rabbitMqUser := configs.Config.RabbitMqUser
-	rabbitMqPassword := configs.Config.RabbitMqPassword
-	rabbitMqHost := configs.Config.RabbitMqHost
-	rabbitMqPort := configs.Config.RabbitMqPort
-	amqpURL := fmt.Sprintf("amqp://%s:%s@%s:%s/", rabbitMqUser, rabbitMqPassword, rabbitMqHost, rabbitMqPort)
+	amqpURL := configs.Config.RabbitMqUrl
 	go func() {
 		err := rabbitConsumer.RunConsumer(amqpURL, configs.Config.JobQueue)
 		if err != nil {

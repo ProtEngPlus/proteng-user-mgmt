@@ -66,6 +66,7 @@ func main() {
 
 	// start server
 	httpPort := configs.Config.HttpPort
+	logger.Zap.Info("proteng-user-mgmt is running on :" + httpPort)
 	err = router.Run(":" + httpPort)
 	if err != nil {
 		logrus.Fatalf("Failed to start server: %v", err)

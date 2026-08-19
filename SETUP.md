@@ -3,15 +3,25 @@
 ## Run locally
 
 1. **Copy the env file**
+
    ```sh
    cp .env.example .env.local
    ```
+
    Fill in real values. Done when: `.env.local` exists with real values (not the empty template).
 
+   `ACCESS_TOKEN_PRIVATE_KEY` is a base64-encoded PEM RSA key (PKCS1 or PKCS8). To generate one locally:
+
+   ```sh
+   openssl genrsa 2048 | tr -d '\r' | openssl base64 -A
+   ```
+
 2. **Install dependencies**
+
    ```sh
    go mod tidy
    ```
+
    Done when: exits 0, no errors.
 
 3. **Run** (must run from the repo root — email templates load via a relative glob path) — `./run.sh` (Git Bash on Windows, or macOS/Linux terminal)

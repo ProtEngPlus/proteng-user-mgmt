@@ -18,6 +18,11 @@
    docker run -d --name mongo -p 27017:27017 mongo
    ```
 
+   Instead of a local Mongo you can point `MONGO_URI` in `.env.local` (not
+   `.env.example`) at a shared cluster - ask a maintainer for the connection
+   string, and set `MONGO_DB` to a name of your own (e.g. `proteng_<yourname>`),
+   never `proteng-dev` / `proteng-production`.
+
    `ACCESS_TOKEN_PRIVATE_KEY` still needs a real value. It is a base64-encoded PEM RSA key (PKCS1 or PKCS8). To generate one locally:
 
    ```sh

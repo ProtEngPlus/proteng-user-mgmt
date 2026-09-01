@@ -8,13 +8,23 @@
    cp .env.example .env.local
    ```
 
-   Fill in real values. Done when: `.env.local` exists with real values (not the empty template).
+   `.env.example` already has working local defaults for `RABBITMQ_URL`
+   (`amqp://guest:guest@localhost:5672/`) and `MONGO_URI`
+   (`mongodb://localhost:27017`). You need a local RabbitMQ and MongoDB running
+   for those to connect:
 
-   `ACCESS_TOKEN_PRIVATE_KEY` is a base64-encoded PEM RSA key (PKCS1 or PKCS8). To generate one locally:
+   ```sh
+   docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+   docker run -d --name mongo -p 27017:27017 mongo
+   ```
+
+   `ACCESS_TOKEN_PRIVATE_KEY` still needs a real value. It is a base64-encoded PEM RSA key (PKCS1 or PKCS8). To generate one locally:
 
    ```sh
    openssl genrsa 2048 | tr -d '\r' | openssl base64 -A
    ```
+
+   The `SMTP_*` block is only needed if you send real emails. Done when: `.env.local` exists, the key is set, and the two containers are running.
 
 2. **Install dependencies**
 

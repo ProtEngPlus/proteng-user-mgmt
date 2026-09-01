@@ -1,88 +1,51 @@
 # Setup
 
-## Run locally
+Setup ทั้งระบบครั้งแรกดูที่ [Guidebook](https://github.com/ProtEngPlus/manual-guides-2023/blob/main/README.md) ไฟล์นี้มีแค่รายละเอียดเฉพาะของ `proteng-user-mgmt`
 
-1. **Copy the env file**
+## รันบนเครื่อง
 
-   ```sh
-   cp .env.example .env.local
-   ```
+ขั้นตอนหลัก (`cp .env.example .env.local` → `go mod tidy` → `./run.sh` และต้องมี RabbitMQ กับ
+MongoDB local) อยู่ใน Guidebook §4.3–4.4 `.env.example` มี default local ครบแล้ว (`RABBITMQ_URL`,
+`MONGO_URI`, `MONGO_DB`)
 
-   `.env.example` already has working local defaults for `RABBITMQ_URL`
-   (`amqp://guest:guest@localhost:5672/`) and `MONGO_URI`
-   (`mongodb://localhost:27017`). You need a local RabbitMQ and MongoDB running
-   for those to connect:
+ที่ต้องรู้เพิ่มเฉพาะ user-mgmt:
 
-   ```sh
-   docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
-   docker run -d --name mongo -p 27017:27017 mongo
-   ```
+- `ACCESS_TOKEN_PRIVATE_KEY` ต้องเป็นค่าจริง เป็น base64 ของ PEM RSA key (PKCS1 หรือ PKCS8)
+  gen เองได้:
 
-   Instead of a local Mongo you can point `MONGO_URI` in `.env.local` (not
-   `.env.example`) at a shared cluster - ask a maintainer for the connection
-   string, and set `MONGO_DB` to a name of your own (e.g. `proteng_<yourname>`),
-   never `proteng-dev` / `proteng-production`.
+  ```sh
+  openssl genrsa 2048 | tr -d '\r' | openssl base64 -A
+  ```
 
-   `ACCESS_TOKEN_PRIVATE_KEY` still needs a real value. It is a base64-encoded PEM RSA key (PKCS1 or PKCS8). To generate one locally:
+  public key คู่นี้เอาไปใส่ `ACCESS_TOKEN_PUBLIC_KEY` ของ `proteng-bff` ด้วย
+- `SMTP_*` block ต้องใส่เฉพาะตอนจะส่งอีเมลจริง
+- ไม่อยากรัน Mongo local จะชี้ `MONGO_URI` ไป shared cluster ก็ได้ ตั้ง `MONGO_DB` เป็นชื่อตัวเอง
+  อย่าใช้ `proteng-dev` / `proteng-production`
+- **ต้องรันจาก root ของ repo** เพราะ email template โหลดด้วย relative glob path
+- เสร็จเมื่อ terminal พิมพ์ `proteng-user-mgmt is running on :8082` (หรือ `HTTP_PORT` ที่ตั้ง) แล้วไม่ crash
 
-   ```sh
-   openssl genrsa 2048 | tr -d '\r' | openssl base64 -A
-   ```
+## Format & lint
 
-   The `SMTP_*` block is only needed if you send real emails. Done when: `.env.local` exists, the key is set, and the two containers are running.
-
-2. **Install dependencies**
-
-   ```sh
-   go mod tidy
-   ```
-
-   Done when: exits 0, no errors.
-
-3. **Run** (must run from the repo root - email templates load via a relative glob path) - `./run.sh` (Git Bash on Windows, or macOS/Linux terminal)
-
-   (just sets `ENV=local` and runs `go run main.go` - `ENV` picks which `.env.<ENV>` file loads, there is no `.env.dev` anymore. Run manually with `ENV=local go run main.go` if you'd rather not use the script. Note: plain `cmd.exe`/PowerShell can't run `.sh` directly - use Git Bash.)
-
-   Done when: terminal prints `proteng-user-mgmt is running on :8082` (or whatever `HTTP_PORT` is set to), with no crash after.
-
-## Format
-
-`gofmt` autofixes on save/commit. Run manually against the whole repo:
+`gofmt` autofix ตอน save/commit, `go vet` รายงานอย่างเดียวต้องแก้เอง รันมือทั้ง repo:
 
 ```sh
 gofmt -l -w .
-```
-
-## Lint
-
-`go vet` reports issues but does not autofix - fix them by hand. Both this and `gofmt` also run in CI (`.github/workflows/test-build-dev.yaml`) on every push - a failing check there means the same thing pre-commit would've caught locally.
-
-```sh
 go vet ./...
 ```
 
-## Pre-commit hooks
-
-Format + lint above run automatically via [pre-commit](https://pre-commit.com/) on `git commit`; `go build` + `go test` additionally run on `git push`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
-
-Install once per clone:
-
-```sh
-pip install pre-commit
-pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg
-```
-
-Run everything manually: `pre-commit run --all-files`
+ทั้งคู่รันเป็น pre-commit hook ให้อัตโนมัติ (ดู [CONTRIBUTING.md](./CONTRIBUTING.md)) และรันใน CI
+ทุก push ด้วย
 
 ## API docs
 
-This service is called internally by proteng-bff only (frontend never calls it directly) - API docs live on **bff's** Swagger UI, not here: `http://localhost:8080/swagger/index.html` (see `proteng-bff/SETUP.md`).
+user-mgmt ถูกเรียกจาก proteng-bff เท่านั้น (frontend ไม่เรียกตรง) API docs อยู่ที่ Swagger ของ
+**bff** ไม่ใช่ที่นี่: `http://localhost:8080/swagger/index.html` (ดู `proteng-bff/SETUP.md`)
 
-## Build (optional, for deployment testing)
+## Build (ถ้าจะทดสอบ deploy)
 
-Env vars are not baked into the image - pass them at run time:
+env var ไม่ถูก bake เข้า image ส่งตอน run:
 
 ```sh
 docker build -t proteng-user-mgmt .
-docker run -d --name proteng-user-mgmt --env-file .env.local --network proteng-net -p 8081:8080 proteng-user-mgmt
+docker run -d --name proteng-user-mgmt --env-file .env.local -p 8082:8082 proteng-user-mgmt
 ```

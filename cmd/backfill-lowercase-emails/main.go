@@ -8,7 +8,7 @@ import (
 
 	"github.com/protengplus/proteng-user-mgmt/configs"
 	"github.com/protengplus/proteng-user-mgmt/database"
-	"github.com/protengplus/proteng-user-mgmt/internal/logger" // add this
+	"github.com/protengplus/proteng-user-mgmt/internal/logger"
 	"github.com/protengplus/proteng-user-mgmt/utils"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -64,7 +64,6 @@ func checkDuplicates(collectionName string) error {
 		}},
 		bson.M{"$match": bson.M{"count": bson.M{"$gt": 1}}},
 	}
-
 	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
 		return fmt.Errorf("duplicate check failed for %s: %w", collectionName, err)
@@ -75,11 +74,10 @@ func checkDuplicates(collectionName string) error {
 	if err := cursor.All(context.Background(), &duplicates); err != nil {
 		return fmt.Errorf("duplicate check decode failed for %s: %w", collectionName, err)
 	}
-
 	if len(duplicates) > 0 {
 		fmt.Printf("found %d duplicate email group(s) in %s (case-insensitive):\n", len(duplicates), collectionName)
 		for _, d := range duplicates {
-			fmt.Printf("  email=%v ids=%v\n", d["_id"], d["ids"])
+			fmt.Printf("- email=%v ids=%v\n", d["_id"], d["ids"])
 		}
 		return fmt.Errorf("aborting: resolve duplicates in %s manually before backfilling (merge or delete)", collectionName)
 	}
@@ -89,7 +87,6 @@ func checkDuplicates(collectionName string) error {
 
 func backfillCollection(collectionName string, dryRun bool) error {
 	collection := database.GetCollection(collectionName)
-
 	cursor, err := collection.Find(context.Background(), bson.M{})
 	if err != nil {
 		return err
@@ -108,7 +105,6 @@ func backfillCollection(collectionName string, dryRun bool) error {
 		if email == normalized {
 			continue
 		}
-
 		if dryRun {
 			fmt.Printf("[dry-run] %s: %v -> %q\n", collectionName, doc["_id"], normalized)
 		} else {

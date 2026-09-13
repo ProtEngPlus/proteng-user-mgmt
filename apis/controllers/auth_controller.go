@@ -181,7 +181,7 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 	passwordResetToken := utils.Encode(resetToken)
 
 	// Update User in Database
-	query := bson.D{{Key: "email", Value: strings.ToLower(userCredential.Email)}}
+	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(userCredential.Email)}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: time.Now().Add(time.Minute * 15)}}}}
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
 
@@ -272,7 +272,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	// Update User in Database
 	hashedPassword, _ := utils.HashPassword(userCredential.NewPassword)
 
-	query := bson.D{{Key: "email", Value: user.Email}}
+	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(user.Email)}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}}
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
 
@@ -315,7 +315,7 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 	emailVerificationToken := utils.Encode(verificationToken)
 
 	// Update User in Database
-	query := bson.D{{Key: "email", Value: strings.ToLower(userCredential.Email)}}
+	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(userCredential.Email)}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "emailVerificationToken", Value: emailVerificationToken}, {Key: "emailVerificationTokenExpire", Value: time.Now().Add(time.Hour * 168)}}}}
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
 

@@ -151,6 +151,13 @@ func (ur *userRepository) Delete(id string) error {
 func (ur *userRepository) EnsureIndexes() error {
 	opt := options.Index()
 	opt.SetUnique(true)
+
+	// Foo@x.com and FOO@X.COM treated as same
+	opt.SetCollation(&options.Collation{
+		Locale:   "en",
+		Strength: 2,
+	})
+
 	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
 
 	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {

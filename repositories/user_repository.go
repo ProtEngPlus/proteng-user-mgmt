@@ -22,6 +22,7 @@ type UserRepository interface {
 	Delete(id string) error
 	GetAll() ([]*models.User, error)
 	FindByEmail(email string) (*models.User, error)
+	EnsureIndexes() error
 }
 
 type userRepository struct {
@@ -100,16 +101,6 @@ func (ur *userRepository) Create(user *models.User) error {
 		}
 		return err
 	}
-
-	// Create a unique index for the email field
-	opt := options.Index()
-	opt.SetUnique(true)
-	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
-
-	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {
-		return errors.New("could not create index for email")
-	}
-
 	return nil
 }
 
@@ -151,6 +142,19 @@ func (ur *userRepository) Delete(id string) error {
 	_, err = ur.collection.DeleteOne(context.Background(), filter)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// make sure index on email exists
+func (ur *userRepository) EnsureIndexes() error {
+	opt := options.Index()
+	opt.SetUnique(true)
+	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
+
+	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {
+		return errors.New("could not create index for email")
 	}
 
 	return nil

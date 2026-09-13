@@ -75,7 +75,7 @@ func (ur *userRepository) FindById(id string) (*models.User, error) {
 }
 
 func (ur *userRepository) FindByEmail(email string) (*models.User, error) {
-	filter := bson.M{"email": email}
+	filter := bson.M{"email": utils.NormalizeEmail(email)}
 
 	var user models.User
 	err := ur.collection.FindOne(context.Background(), filter).Decode(&user)
@@ -88,6 +88,7 @@ func (ur *userRepository) FindByEmail(email string) (*models.User, error) {
 
 func (ur *userRepository) Create(user *models.User) error {
 	user.Id = primitive.NewObjectID()
+	user.Email = utils.NormalizeEmail(user.Email)
 
 	hashedPassword, _ := utils.HashPassword(user.Password)
 	user.Password = hashedPassword
@@ -121,7 +122,7 @@ func (ur *userRepository) Update(id string, user *models.User) error {
 
 	update := bson.M{
 		"$set": bson.M{
-			"email":       user.Email,
+			"email":       utils.NormalizeEmail(user.Email),
 			"password":    user.Password,
 			"name":        user.Name,
 			"surname":     user.Surname,

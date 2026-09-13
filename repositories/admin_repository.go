@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+
 	"github.com/protengplus/proteng-user-mgmt/database"
 	"github.com/protengplus/proteng-user-mgmt/utils"
 
@@ -74,7 +75,7 @@ func (ur *adminRepository) FindById(id string) (*models.Admin, error) {
 }
 
 func (ur *adminRepository) FindByEmail(email string) (*models.Admin, error) {
-	filter := bson.M{"email": email}
+	filter := bson.M{"email": utils.NormalizeEmail(email)}
 
 	var admin models.Admin
 	err := ur.collection.FindOne(context.Background(), filter).Decode(&admin)
@@ -87,6 +88,7 @@ func (ur *adminRepository) FindByEmail(email string) (*models.Admin, error) {
 
 func (ur *adminRepository) Create(admin *models.Admin) error {
 	admin.Id = primitive.NewObjectID()
+	admin.Email = utils.NormalizeEmail(admin.Email)
 
 	hashedPassword, _ := utils.HashPassword(admin.Password)
 	admin.Password = hashedPassword
@@ -120,7 +122,7 @@ func (ur *adminRepository) Update(id string, admin *models.Admin) error {
 
 	update := bson.M{
 		"$set": bson.M{
-			"email":    admin.Email,
+			"email":    utils.NormalizeEmail(admin.Email),
 			"password": admin.Password,
 			"username": admin.Username,
 		},

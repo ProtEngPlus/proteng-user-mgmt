@@ -25,7 +25,7 @@ func main() {
 	router := gin.New()
 
 	// database
-	err := database.ConnectToDB()
+	err := database.ConnectWithRetry(database.ConnectToDB, 5, 10*time.Second)
 	if err != nil {
 		logrus.Fatalf("Failed to connect to database: %v", err)
 	}

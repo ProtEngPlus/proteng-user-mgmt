@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/protengplus/proteng-user-mgmt/models"
@@ -56,6 +58,10 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 
 	err = uc.userRepository.Create(&user)
 	if err != nil {
+		if errors.Is(err, repositories.ErrDuplicateEmail) {
+			apiutil.ApiResponseConflict(c, err, "error: email already registered")
+			return
+		}
 		apiutil.ApiResponseInternalServerError(c, err)
 		return
 	}

@@ -15,6 +15,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var ErrDuplicateEmail = errors.New("user with that email already exists")
+
 type UserRepository interface {
 	Create(user *models.User) error
 	FindById(id string) (*models.User, error)
@@ -97,7 +99,7 @@ func (ur *userRepository) Create(user *models.User) error {
 	_, err := ur.collection.InsertOne(context.Background(), user)
 	if err != nil {
 		if er, ok := err.(mongo.WriteException); ok && er.WriteErrors[0].Code == 11000 {
-			return errors.New("user with that email already exist")
+			return ErrDuplicateEmail
 		}
 		return err
 	}

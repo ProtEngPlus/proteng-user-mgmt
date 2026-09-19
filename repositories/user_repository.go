@@ -22,6 +22,7 @@ type UserRepository interface {
 	Delete(id string) error
 	GetAll() ([]*models.User, error)
 	FindByEmail(email string) (*models.User, error)
+	EnsureIndexes() error
 }
 
 type userRepository struct {
@@ -75,7 +76,7 @@ func (ur *userRepository) FindById(id string) (*models.User, error) {
 }
 
 func (ur *userRepository) FindByEmail(email string) (*models.User, error) {
-	filter := bson.M{"email": email}
+	filter := bson.M{"email": utils.NormalizeEmail(email)}
 
 	var user models.User
 	err := ur.collection.FindOne(context.Background(), filter).Decode(&user)
@@ -88,6 +89,7 @@ func (ur *userRepository) FindByEmail(email string) (*models.User, error) {
 
 func (ur *userRepository) Create(user *models.User) error {
 	user.Id = primitive.NewObjectID()
+	user.Email = utils.NormalizeEmail(user.Email)
 
 	hashedPassword, _ := utils.HashPassword(user.Password)
 	user.Password = hashedPassword
@@ -99,16 +101,6 @@ func (ur *userRepository) Create(user *models.User) error {
 		}
 		return err
 	}
-
-	// Create a unique index for the email field
-	opt := options.Index()
-	opt.SetUnique(true)
-	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
-
-	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {
-		return errors.New("could not create index for email")
-	}
-
 	return nil
 }
 
@@ -121,7 +113,7 @@ func (ur *userRepository) Update(id string, user *models.User) error {
 
 	update := bson.M{
 		"$set": bson.M{
-			"email":       user.Email,
+			"email":       utils.NormalizeEmail(user.Email),
 			"password":    user.Password,
 			"name":        user.Name,
 			"surname":     user.Surname,
@@ -150,6 +142,26 @@ func (ur *userRepository) Delete(id string) error {
 	_, err = ur.collection.DeleteOne(context.Background(), filter)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// make sure index on email exists
+func (ur *userRepository) EnsureIndexes() error {
+	opt := options.Index()
+	opt.SetUnique(true)
+
+	// Foo@x.com and FOO@X.COM treated as same
+	opt.SetCollation(&options.Collation{
+		Locale:   "en",
+		Strength: 2,
+	})
+
+	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
+
+	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {
+		return errors.New("could not create index for email")
 	}
 
 	return nil

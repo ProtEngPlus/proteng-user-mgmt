@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"errors"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/protengplus/proteng-user-mgmt/models"
@@ -45,28 +43,6 @@ func (uc *UserController) GetUser(c *gin.Context) {
 	}
 
 	apiutil.ApiResponseOk(c, models.FilteredResponse(user))
-}
-
-// CreateUser creates a new user
-func (uc *UserController) CreateUser(c *gin.Context) {
-	var user models.User
-	err := c.BindJSON(&user)
-	if err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
-		return
-	}
-
-	err = uc.userRepository.Create(&user)
-	if err != nil {
-		if errors.Is(err, repositories.ErrDuplicateEmail) {
-			apiutil.ApiResponseConflict(c, err, "error: email already registered")
-			return
-		}
-		apiutil.ApiResponseInternalServerError(c, err)
-		return
-	}
-
-	apiutil.ApiResponseOk(c, models.FilteredResponse(&user))
 }
 
 // UpdateUser updates an existing user

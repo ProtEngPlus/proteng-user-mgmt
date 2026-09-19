@@ -12,7 +12,6 @@ func UserRoute(router *gin.Engine, ur repositories.UserRepository) {
 
 	router.GET("/users", uc.GetAllUsers)
 	router.GET("/users/:id", uc.GetUser)
-	router.POST("/users", uc.CreateUser)
 	router.PUT("/users/:id", uc.UpdateUser)
 	router.DELETE("/users/:id", uc.DeleteUser)
 }

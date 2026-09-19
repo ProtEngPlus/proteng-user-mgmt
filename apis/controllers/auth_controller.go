@@ -38,6 +38,46 @@ func NewAuthController(userRepository repositories.UserRepository, adminReposito
 	}
 }
 
+func (ac *AuthController) RegisterUser(c *gin.Context) {
+	var user models.User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
+		return
+	}
+
+	verificationToken := randstr.String(20)
+	user.IsVerified = false
+	user.EmailVerificationToken = utils.Encode(verificationToken)
+	user.EmailVerificationTokenExpire = time.Now().Add(time.Hour * 168)
+
+	if err := ac.userRepository.Create(&user); err != nil {
+		if errors.Is(err, repositories.ErrDuplicateEmail) {
+			apiutil.ApiResponseConflict(c, err, "error: email already registered")
+			return
+		}
+		apiutil.ApiResponseInternalServerError(c, err)
+		return
+	}
+
+	firstName := user.Name
+	if strings.Contains(firstName, " ") {
+		firstName = strings.Split(firstName, " ")[1]
+	}
+
+	emailData := utils.EmailData{
+		URL:       configs.Config.Origin + "/success-verified?token=" + verificationToken,
+		FirstName: firstName,
+		Subject:   "Your email verification token (valid for 7 days)",
+	}
+
+	if err := utils.SendEmail(&user, &emailData, ac.temp, "verificationEmail"); err != nil {
+		apiutil.ApiResponseBadGateway(c, err, "error: account created but verification email could not be sent, please resend from the verification page")
+		return
+	}
+
+	apiutil.ApiResponseOk(c, models.FilteredResponse(&user), "Verification email sent")
+}
+
 func (ac *AuthController) SignInUser(c *gin.Context) {
 	var credentials *models.SignInInput
 

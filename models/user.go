@@ -1,18 +1,22 @@
 package models
 
 import (
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type User struct {
-	Id         primitive.ObjectID `bson:"_id" json:"id"`
-	Email      string             `bson:"email" json:"email"`
-	Password   string             `bson:"password" json:"password"`
-	Name       string             `bson:"name" json:"name"`
-	Surname    string             `bson:"surname" json:"surname"`
-	Role       []string           `bson:"role" json:"role"`
-	UserRole   string             `bson:"user_role" json:"user_role"`
-	IsVerified bool               `bson:"is_verified" json:"is_verified"`
+	Id                           primitive.ObjectID `bson:"_id" json:"id"`
+	Email                        string             `bson:"email" json:"email"`
+	Password                     string             `bson:"password" json:"password"`
+	Name                         string             `bson:"name" json:"name"`
+	Surname                      string             `bson:"surname" json:"surname"`
+	Role                         []string           `bson:"role" json:"role"`
+	UserRole                     string             `bson:"user_role" json:"user_role"`
+	IsVerified                   bool               `bson:"is_verified" json:"is_verified"`
+	EmailVerificationToken       string             `bson:"emailVerificationToken,omitempty" json:"-"`
+	EmailVerificationTokenExpire time.Time          `bson:"emailVerificationTokenExpire,omitempty" json:"-"`
 }
 
 type SignInInput struct {

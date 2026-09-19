@@ -22,6 +22,7 @@ type AdminRepository interface {
 	Delete(id string) error
 	GetAll() ([]*models.Admin, error)
 	FindByEmail(email string) (*models.Admin, error)
+	EnsureIndexes() error
 }
 
 type adminRepository struct {
@@ -101,15 +102,6 @@ func (ur *adminRepository) Create(admin *models.Admin) error {
 		return err
 	}
 
-	// Create a unique index for the email field
-	opt := options.Index()
-	opt.SetUnique(true)
-	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
-
-	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {
-		return errors.New("could not create index for email")
-	}
-
 	return nil
 }
 
@@ -147,6 +139,26 @@ func (ur *adminRepository) Delete(id string) error {
 	_, err = ur.collection.DeleteOne(context.Background(), filter)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// make sure index on email exists
+func (ur *adminRepository) EnsureIndexes() error {
+	opt := options.Index()
+	opt.SetUnique(true)
+
+	// Foo@x.com and FOO@X.COM treated as same
+	opt.SetCollation(&options.Collation{
+		Locale:   "en",
+		Strength: 2,
+	})
+
+	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
+
+	if _, err := ur.collection.Indexes().CreateOne(context.Background(), index); err != nil {
+		return errors.New("could not create index for email")
 	}
 
 	return nil

@@ -401,9 +401,10 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 
 	// Send Email
 	emailData := utils.EmailData{
-		URL:       configs.Config.Origin + "/success-verified?token=" + verificationToken,
-		FirstName: firstName,
-		Subject:   fmt.Sprintf("Your email verification token (valid for %d days)", verificationTokenDaysTTL),
+		URL:        configs.Config.Origin + "/success-verified?token=" + verificationToken,
+		FirstName:  firstName,
+		Subject:    fmt.Sprintf("Your email verification token (valid for %d days)", verificationTokenDaysTTL),
+		ExpiryDays: verificationTokenDaysTTL,
 	}
 
 	err = utils.SendEmail(user, &emailData, ac.temp, "verificationEmail")

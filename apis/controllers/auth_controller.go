@@ -46,6 +46,12 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 		return
 	}
 
+	// Validate Password
+	if err := utils.ValidatePasswordStrength(user.Password); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: "+err.Error())
+		return
+	}
+
 	verificationToken := randstr.String(20)
 	user.IsVerified = false
 	user.EmailVerificationToken = utils.Encode(verificationToken)
@@ -265,6 +271,12 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 		return
 	}
 
+	// Validate Password
+	if err := utils.ValidatePasswordStrength(userCredential.Password); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: "+err.Error())
+		return
+	}
+
 	hashedPassword, _ := utils.HashPassword(userCredential.Password)
 
 	passwordResetToken := utils.Encode(resetToken)
@@ -307,6 +319,12 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	// Validate Current Password
 	if err := utils.VerifyPassword(user.Password, userCredential.CurrentPassword); err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: incorrect current password")
+		return
+	}
+
+	// Validate New Password
+	if err := utils.ValidatePasswordStrength(userCredential.NewPassword); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: "+err.Error())
 		return
 	}
 

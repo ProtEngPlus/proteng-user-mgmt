@@ -289,14 +289,17 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 	// Update User in Database
 	query := bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: time.Now()}}}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}, {Key: "$unset", Value: bson.D{{Key: "passwordResetToken", Value: ""}, {Key: "passwordResetTokenExpire", Value: ""}}}}
-	result, err := ac.collection.UpdateOne(context.Background(), query, update)
 
-	if result.MatchedCount == 0 {
-		apiutil.ApiResponseErrorBadRequest(c, fmt.Errorf("invalid token"), "Token is invalid or has expired")
-		return
-	}
-
+	var user models.User
+	err := ac.collection.FindOneAndUpdate(
+		context.Background(), query, update,
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&user)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			apiutil.ApiResponseErrorBadRequest(c, fmt.Errorf("invalid token"), "Token is invalid or has expired")
+			return
+		}
 		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
@@ -304,6 +307,19 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 	// c.SetCookie("access_token", "", -1, "/", "localhost", false, true)
 	// c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
 	// c.SetCookie("logged_in", "", -1, "/", "localhost", false, true)
+
+	firstName := user.Name
+	if strings.Contains(firstName, " ") {
+		firstName = strings.Split(firstName, " ")[1]
+	}
+
+	emailData := utils.EmailData{
+		FirstName: firstName,
+		Subject:   "Your password has been changed",
+	}
+	if err := utils.SendEmail(&user, &emailData, ac.temp, "passwordChanged"); err != nil {
+		fmt.Println("Failed to send password-changed notification:", err)
+	}
 
 	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")
 }
@@ -342,6 +358,19 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	if err != nil {
 		apiutil.ApiResponseForbidden(c, err)
 		return
+	}
+
+	firstName := user.Name
+	if strings.Contains(firstName, " ") {
+		firstName = strings.Split(firstName, " ")[1]
+	}
+
+	emailData := utils.EmailData{
+		FirstName: firstName,
+		Subject:   "Your password has been changed",
+	}
+	if err := utils.SendEmail(user, &emailData, ac.temp, "passwordChanged"); err != nil {
+		fmt.Println("Failed to send password-changed notification:", err)
 	}
 
 	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")

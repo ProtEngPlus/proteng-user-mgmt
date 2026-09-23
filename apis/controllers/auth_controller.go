@@ -39,6 +39,8 @@ func NewAuthController(userRepository repositories.UserRepository, adminReposito
 	}
 }
 
+const verificationTokenDaysTTL = 7
+
 func (ac *AuthController) RegisterUser(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
@@ -49,7 +51,7 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 	verificationToken := randstr.String(20)
 	user.IsVerified = false
 	user.EmailVerificationToken = utils.Encode(verificationToken)
-	user.EmailVerificationTokenExpire = time.Now().Add(time.Hour * 168)
+	user.EmailVerificationTokenExpire = time.Now().Add(verificationTokenDaysTTL * 24 * time.Hour)
 
 	if err := ac.userRepository.Create(&user); err != nil {
 		if errors.Is(err, repositories.ErrDuplicateEmail) {
@@ -66,9 +68,10 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 	}
 
 	emailData := utils.EmailData{
-		URL:       configs.Config.Origin + "/success-verified?token=" + verificationToken,
-		FirstName: firstName,
-		Subject:   "Your email verification token (valid for 7 days)",
+		URL:        configs.Config.Origin + "/success-verified?token=" + verificationToken,
+		FirstName:  firstName,
+		Subject:    fmt.Sprintf("Your email verification token (valid for %d days)", verificationTokenDaysTTL),
+		ExpiryDays: verificationTokenDaysTTL,
 	}
 
 	if err := utils.SendEmail(&user, &emailData, ac.temp, "verificationEmail"); err != nil {
@@ -329,8 +332,6 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 
 	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")
 }
-
-const verificationTokenDaysTTL = 7
 
 func (ac *AuthController) SendVerification(c *gin.Context) {
 	var userCredential *models.SendVerificationInput

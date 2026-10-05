@@ -40,6 +40,7 @@ func NewAuthController(userRepository repositories.UserRepository, adminReposito
 }
 
 const verificationTokenDaysTTL = 7
+const passwordResetTokenMinutesTTL = 15
 
 func (ac *AuthController) RegisterUser(c *gin.Context) {
 	var user models.User
@@ -232,12 +233,20 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 
 	// Update User in Database
 	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(userCredential.Email)}}
-	update := bson.D{{Key: "$set", Value: bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: time.Now().Add(time.Minute * 15)}}}}
+	update := bson.D{{
+		Key: "$set",
+		Value: bson.D{
+			{
+				Key:   "passwordResetToken",
+				Value: passwordResetToken,
+			},
+			{
+				Key:   "passwordResetTokenExpire",
+				Value: time.Now().Add(passwordResetTokenMinutesTTL * time.Minute),
+			},
+		}}}
 
-	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
-	defer cancel()
-
-	result, err := ac.collection.UpdateOne(ctx, query, update)
+	result, err := ac.collection.UpdateOne(context.Background(), query, update)
 
 	if result.MatchedCount == 0 {
 		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
@@ -256,9 +265,10 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 
 	// Send Email
 	emailData := utils.EmailData{
-		URL:       configs.Config.Origin + "/reset-password?token=" + resetToken,
-		FirstName: firstName,
-		Subject:   "Your password reset token (valid for 10 minutes)",
+		URL:           configs.Config.Origin + "/reset-password?token=" + resetToken,
+		FirstName:     firstName,
+		Subject:       fmt.Sprintf("Your password reset token (valid for %d minutes)", passwordResetTokenMinutesTTL),
+		ExpiryMinutes: passwordResetTokenMinutesTTL,
 	}
 
 	err = utils.SendEmail(user, &emailData, ac.temp, "resetPassword.html")
@@ -431,9 +441,10 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 
 	// Send Email
 	emailData := utils.EmailData{
-		URL:       configs.Config.Origin + "/success-verified?token=" + verificationToken,
-		FirstName: firstName,
-		Subject:   fmt.Sprintf("Your email verification token (valid for %d days)", verificationTokenDaysTTL),
+		URL:        configs.Config.Origin + "/success-verified?token=" + verificationToken,
+		FirstName:  firstName,
+		Subject:    fmt.Sprintf("Your email verification token (valid for %d days)", verificationTokenDaysTTL),
+		ExpiryDays: verificationTokenDaysTTL,
 	}
 
 	err = utils.SendEmail(user, &emailData, ac.temp, "verificationEmail")

@@ -14,14 +14,15 @@ import (
 )
 
 type EmailData struct {
-	URL        string
-	FirstName  string
-	Subject    string
-	ExpiryDays int
-	JobName    string
-	JobState   string
-	StageID    string
-	StageName  string
+	URL           string
+	FirstName     string
+	Subject       string
+	ExpiryDays    int
+	JobName       string
+	JobState      string
+	StageID       string
+	StageName     string
+	ExpiryMinutes int
 }
 
 // 👇 Email template parser

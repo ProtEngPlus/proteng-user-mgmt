@@ -49,6 +49,12 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 		return
 	}
 
+	// Validate Password
+	if err := utils.ValidatePasswordStrength(user.Password); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: "+err.Error())
+		return
+	}
+
 	verificationToken := randstr.String(20)
 	user.IsVerified = false
 	user.EmailVerificationToken = utils.Encode(verificationToken)
@@ -282,6 +288,12 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 		return
 	}
 
+	// Validate Password
+	if err := utils.ValidatePasswordStrength(userCredential.Password); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: "+err.Error())
+		return
+	}
+
 	hashedPassword, _ := utils.HashPassword(userCredential.Password)
 
 	passwordResetToken := utils.Encode(resetToken)
@@ -289,7 +301,11 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 	// Update User in Database
 	query := bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: time.Now()}}}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}, {Key: "$unset", Value: bson.D{{Key: "passwordResetToken", Value: ""}, {Key: "passwordResetTokenExpire", Value: ""}}}}
-	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	result, err := ac.collection.UpdateOne(ctx, query, update)
 
 	if result.MatchedCount == 0 {
 		apiutil.ApiResponseErrorBadRequest(c, fmt.Errorf("invalid token"), "Token is invalid or has expired")
@@ -327,12 +343,22 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		return
 	}
 
+	// Validate New Password
+	if err := utils.ValidatePasswordStrength(userCredential.NewPassword); err != nil {
+		apiutil.ApiResponseErrorBadRequest(c, err, "error: "+err.Error())
+		return
+	}
+
 	// Update User in Database
 	hashedPassword, _ := utils.HashPassword(userCredential.NewPassword)
 
 	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(user.Email)}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}}
-	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	result, err := ac.collection.UpdateOne(ctx, query, update)
 
 	if result.MatchedCount == 0 {
 		apiutil.ApiResponseErrorBadRequest(c, err, "Cannot update password")

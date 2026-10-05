@@ -2,6 +2,7 @@ package apiutil
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/protengplus/proteng-user-mgmt/models"
 
@@ -70,6 +71,19 @@ func ApiResponseBadGateway(c *gin.Context, err error, messages ...string) {
 	c.AbortWithStatusJSON(http.StatusBadGateway, models.HttpResponseError{
 		Code:    http.StatusBadGateway,
 		Error:   err.Error(),
+		Message: messages[0],
+	})
+}
+
+func ApiResponseTooManyRequests(c *gin.Context, retryAfterSeconds int, messages ...string) {
+	if len(messages) == 0 {
+		messages = append(messages, "")
+	}
+	c.Header("Retry-After", strconv.Itoa(retryAfterSeconds))
+	c.AbortWithStatusJSON(http.StatusTooManyRequests, models.HttpResponseErrorWithData{
+		Code:    http.StatusTooManyRequests,
+		Data:    models.RetryAfter{RetryAfterSeconds: retryAfterSeconds},
+		Error:   "too many requests",
 		Message: messages[0],
 	})
 }

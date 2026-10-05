@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -41,6 +42,15 @@ func NewAuthController(userRepository repositories.UserRepository, adminReposito
 
 const verificationTokenDaysTTL = 7
 const passwordResetTokenMinutesTTL = 15
+const verificationResendCooldown = 60 * time.Second
+
+func verificationResendWait(tokenExpire, now time.Time) time.Duration {
+	lastSent := tokenExpire.Add(-verificationTokenDaysTTL * 24 * time.Hour)
+	if wait := verificationResendCooldown - now.Sub(lastSent); wait > 0 {
+		return wait
+	}
+	return 0
+}
 
 func (ac *AuthController) RegisterUser(c *gin.Context) {
 	var user models.User
@@ -418,10 +428,8 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 		return
 	}
 
-	// Can resent email after passing 60s
-	lastSent := user.EmailVerificationTokenExpire.Add(-verificationTokenDaysTTL * 24 * time.Hour)
-	if time.Since(lastSent) < 60*time.Second {
-		apiutil.ApiResponseOk(c, userCredential, message)
+	if wait := verificationResendWait(user.EmailVerificationTokenExpire, time.Now()); wait > 0 {
+		apiutil.ApiResponseTooManyRequests(c, int(math.Ceil(wait.Seconds())), "error: please wait before requesting another verification email")
 		return
 	}
 

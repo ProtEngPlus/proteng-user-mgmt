@@ -227,7 +227,11 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 	// Update User in Database
 	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(userCredential.Email)}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: time.Now().Add(time.Minute * 15)}}}}
-	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	result, err := ac.collection.UpdateOne(ctx, query, update)
 
 	if result.MatchedCount == 0 {
 		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
@@ -275,7 +279,11 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 	// Update User in Database
 	query := bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: time.Now()}}}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}, {Key: "$unset", Value: bson.D{{Key: "passwordResetToken", Value: ""}, {Key: "passwordResetTokenExpire", Value: ""}}}}
-	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	result, err := ac.collection.UpdateOne(ctx, query, update)
 
 	if result.MatchedCount == 0 {
 		apiutil.ApiResponseErrorBadRequest(c, fmt.Errorf("invalid token"), "Token is invalid or has expired")
@@ -318,7 +326,11 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 
 	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(user.Email)}}
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}}
-	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	result, err := ac.collection.UpdateOne(ctx, query, update)
 
 	if result.MatchedCount == 0 {
 		apiutil.ApiResponseErrorBadRequest(c, err, "Cannot update password")

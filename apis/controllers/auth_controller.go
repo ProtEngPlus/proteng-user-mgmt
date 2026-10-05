@@ -7,7 +7,6 @@ import (
 	"html/template"
 	"math"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/protengplus/proteng-user-mgmt/configs"
 	"github.com/protengplus/proteng-user-mgmt/database"
+	"github.com/protengplus/proteng-user-mgmt/internal/logger"
 	"github.com/protengplus/proteng-user-mgmt/models"
 	"github.com/protengplus/proteng-user-mgmt/repositories"
 	"github.com/protengplus/proteng-user-mgmt/utils"
@@ -79,14 +79,9 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	firstName := user.Name
-	if strings.Contains(firstName, " ") {
-		firstName = strings.Split(firstName, " ")[1]
-	}
-
 	emailData := utils.EmailData{
 		URL:        configs.Config.Origin + "/success-verified?token=" + verificationToken,
-		FirstName:  firstName,
+		FirstName:  user.Name,
 		Subject:    fmt.Sprintf("Your email verification token (valid for %d days)", verificationTokenDaysTTL),
 		ExpiryDays: verificationTokenDaysTTL,
 	}
@@ -267,16 +262,10 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
-	var firstName = user.Name
-
-	if strings.Contains(firstName, " ") {
-		firstName = strings.Split(firstName, " ")[1]
-	}
-
 	// Send Email
 	emailData := utils.EmailData{
 		URL:           configs.Config.Origin + "/reset-password?token=" + resetToken,
-		FirstName:     firstName,
+		FirstName:     user.Name,
 		Subject:       fmt.Sprintf("Your password reset token (valid for %d minutes)", passwordResetTokenMinutesTTL),
 		ExpiryMinutes: passwordResetTokenMinutesTTL,
 	}
@@ -330,17 +319,12 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 	// c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
 	// c.SetCookie("logged_in", "", -1, "/", "localhost", false, true)
 
-	firstName := user.Name
-	if strings.Contains(firstName, " ") {
-		firstName = strings.Split(firstName, " ")[1]
-	}
-
 	emailData := utils.EmailData{
-		FirstName: firstName,
+		FirstName: user.Name,
 		Subject:   "Your password has been changed",
 	}
 	if err := utils.SendEmail(&user, &emailData, ac.temp, "passwordChanged"); err != nil {
-		fmt.Println("Failed to send password-changed notification:", err)
+		logger.Errorf("Failed to send password-changed notification: %v", err)
 	}
 
 	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")
@@ -392,17 +376,12 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	firstName := user.Name
-	if strings.Contains(firstName, " ") {
-		firstName = strings.Split(firstName, " ")[1]
-	}
-
 	emailData := utils.EmailData{
-		FirstName: firstName,
+		FirstName: user.Name,
 		Subject:   "Your password has been changed",
 	}
 	if err := utils.SendEmail(user, &emailData, ac.temp, "passwordChanged"); err != nil {
-		fmt.Println("Failed to send password-changed notification:", err)
+		logger.Errorf("Failed to send password-changed notification: %v", err)
 	}
 
 	apiutil.ApiResponseOk(c, nil, "Password data updated successfully")
@@ -466,16 +445,10 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
-	var firstName = user.Name
-
-	if strings.Contains(firstName, " ") {
-		firstName = strings.Split(firstName, " ")[1]
-	}
-
 	// Send Email
 	emailData := utils.EmailData{
 		URL:        configs.Config.Origin + "/success-verified?token=" + verificationToken,
-		FirstName:  firstName,
+		FirstName:  user.Name,
 		Subject:    fmt.Sprintf("Your email verification token (valid for %d days)", verificationTokenDaysTTL),
 		ExpiryDays: verificationTokenDaysTTL,
 	}

@@ -2,8 +2,10 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
-	"log"
+	"regexp"
+	"strings"
 
 	"github.com/k3a/html2text"
 	"github.com/protengplus/proteng-user-mgmt/configs"
@@ -23,35 +25,53 @@ type EmailData struct {
 	ExpiryMinutes int
 }
 
-// 👇 Email template parser
 func SendEmail(user *models.User, data *EmailData, temp *template.Template, templateName string) error {
-
-	// Sender data.
-	from := configs.Config.EmailFrom
-	smtpPass := configs.Config.SMTPPass
-	smtpUser := configs.Config.SMTPUser
-	to := user.Email
-	smtpHost := configs.Config.SMTPHost
-	smtpPort := configs.Config.SMTPPort
-
-	var body bytes.Buffer
-
-	if err := temp.ExecuteTemplate(&body, templateName, &data); err != nil {
-		log.Fatal("Could not execute template", err)
+	html, err := RenderEmail(temp, templateName, data)
+	if err != nil {
+		return err
 	}
 
 	m := gomail.NewMessage()
-	m.SetHeader("From", from)
-	m.SetHeader("To", to)
+	m.SetHeader("From", configs.Config.EmailFrom)
+	m.SetHeader("To", user.Email)
 	m.SetHeader("Subject", data.Subject)
-	m.SetBody("text/html", body.String())
-	m.AddAlternative("text/plain", html2text.HTML2Text(body.String()))
+	m.SetBody("text/plain", PlainTextFromHTML(html))
+	m.AddAlternative("text/html", html)
 
-	d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
+	d := gomail.NewDialer(configs.Config.SMTPHost, configs.Config.SMTPPort, configs.Config.SMTPUser, configs.Config.SMTPPass)
+	return d.DialAndSend(m)
+}
 
-	// Send Email
-	if err := d.DialAndSend(m); err != nil {
-		return err
+func RenderEmail(temp *template.Template, templateName string, data *EmailData) (string, error) {
+	var body bytes.Buffer
+	if err := temp.ExecuteTemplate(&body, templateName, data); err != nil {
+		return "", fmt.Errorf("render email template %q: %w", templateName, err)
 	}
-	return nil
+	return body.String(), nil
+}
+
+var (
+	selfClosingBr = regexp.MustCompile(`(?i)<br\s*/>`)
+	closingAnchor = regexp.MustCompile(`(?i)</a\s*>`)
+)
+
+func PlainTextFromHTML(html string) string {
+	html = selfClosingBr.ReplaceAllString(html, "<br>")
+	html = closingAnchor.ReplaceAllString(html, "</a><br>")
+	lines := strings.Split(html2text.HTML2Text(html), "\n")
+	out := make([]string, 0, len(lines))
+	blank := false
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			if !blank && len(out) > 0 {
+				out = append(out, "")
+			}
+			blank = true
+			continue
+		}
+		out = append(out, line)
+		blank = false
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
 }

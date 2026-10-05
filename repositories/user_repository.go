@@ -36,14 +36,17 @@ func NewUserRepository() UserRepository {
 func (ur *userRepository) GetAll() ([]*models.User, error) {
 	var users []*models.User
 
-	cursor, err := ur.collection.Find(context.Background(), bson.M{})
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	cursor, err := ur.collection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
 
-	defer cursor.Close(context.Background())
+	defer cursor.Close(ctx)
 
-	for cursor.Next(context.Background()) {
+	for cursor.Next(ctx) {
 		var user models.User
 		if err := cursor.Decode(&user); err != nil {
 			return nil, err
@@ -66,8 +69,11 @@ func (ur *userRepository) FindById(id string) (*models.User, error) {
 
 	filter := bson.M{"_id": objectId}
 
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
 	var user models.User
-	err = ur.collection.FindOne(context.Background(), filter).Decode(&user)
+	err = ur.collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +84,11 @@ func (ur *userRepository) FindById(id string) (*models.User, error) {
 func (ur *userRepository) FindByEmail(email string) (*models.User, error) {
 	filter := bson.M{"email": utils.NormalizeEmail(email)}
 
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
 	var user models.User
-	err := ur.collection.FindOne(context.Background(), filter).Decode(&user)
+	err := ur.collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
@@ -94,13 +103,26 @@ func (ur *userRepository) Create(user *models.User) error {
 	hashedPassword, _ := utils.HashPassword(user.Password)
 	user.Password = hashedPassword
 
-	_, err := ur.collection.InsertOne(context.Background(), user)
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	_, err := ur.collection.InsertOne(ctx, user)
 	if err != nil {
 		if er, ok := err.(mongo.WriteException); ok && er.WriteErrors[0].Code == 11000 {
 			return errors.New("user with that email already exist")
 		}
 		return err
 	}
+
+	// Create a unique index for the email field
+	opt := options.Index()
+	opt.SetUnique(true)
+	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
+
+	if _, err := ur.collection.Indexes().CreateOne(ctx, index); err != nil {
+		return errors.New("could not create index for email")
+	}
+
 	return nil
 }
 
@@ -123,7 +145,10 @@ func (ur *userRepository) Update(id string, user *models.User) error {
 		},
 	}
 
-	_, err = ur.collection.UpdateOne(context.Background(), filter, update)
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	_, err = ur.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -139,7 +164,10 @@ func (ur *userRepository) Delete(id string) error {
 
 	filter := bson.M{"_id": objectId}
 
-	_, err = ur.collection.DeleteOne(context.Background(), filter)
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	_, err = ur.collection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

@@ -36,14 +36,17 @@ func NewAdminRepository() AdminRepository {
 func (ur *adminRepository) GetAll() ([]*models.Admin, error) {
 	var admins []*models.Admin
 
-	cursor, err := ur.collection.Find(context.Background(), bson.M{})
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	cursor, err := ur.collection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
 
-	defer cursor.Close(context.Background())
+	defer cursor.Close(ctx)
 
-	for cursor.Next(context.Background()) {
+	for cursor.Next(ctx) {
 		var admin models.Admin
 		if err := cursor.Decode(&admin); err != nil {
 			return nil, err
@@ -66,8 +69,11 @@ func (ur *adminRepository) FindById(id string) (*models.Admin, error) {
 
 	filter := bson.M{"_id": objectId}
 
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
 	var admin models.Admin
-	err = ur.collection.FindOne(context.Background(), filter).Decode(&admin)
+	err = ur.collection.FindOne(ctx, filter).Decode(&admin)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +84,11 @@ func (ur *adminRepository) FindById(id string) (*models.Admin, error) {
 func (ur *adminRepository) FindByEmail(email string) (*models.Admin, error) {
 	filter := bson.M{"email": utils.NormalizeEmail(email)}
 
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
 	var admin models.Admin
-	err := ur.collection.FindOne(context.Background(), filter).Decode(&admin)
+	err := ur.collection.FindOne(ctx, filter).Decode(&admin)
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +103,24 @@ func (ur *adminRepository) Create(admin *models.Admin) error {
 	hashedPassword, _ := utils.HashPassword(admin.Password)
 	admin.Password = hashedPassword
 
-	_, err := ur.collection.InsertOne(context.Background(), admin)
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	_, err := ur.collection.InsertOne(ctx, admin)
 	if err != nil {
 		if er, ok := err.(mongo.WriteException); ok && er.WriteErrors[0].Code == 11000 {
 			return errors.New("admin with that email already exist")
 		}
 		return err
+	}
+
+	// Create a unique index for the email field
+	opt := options.Index()
+	opt.SetUnique(true)
+	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
+
+	if _, err := ur.collection.Indexes().CreateOne(ctx, index); err != nil {
+		return errors.New("could not create index for email")
 	}
 
 	return nil
@@ -120,7 +141,10 @@ func (ur *adminRepository) Update(id string, admin *models.Admin) error {
 		},
 	}
 
-	_, err = ur.collection.UpdateOne(context.Background(), filter, update)
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	_, err = ur.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -136,7 +160,10 @@ func (ur *adminRepository) Delete(id string) error {
 
 	filter := bson.M{"_id": objectId}
 
-	_, err = ur.collection.DeleteOne(context.Background(), filter)
+	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
+	defer cancel()
+
+	_, err = ur.collection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

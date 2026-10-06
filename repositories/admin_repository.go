@@ -114,15 +114,6 @@ func (ur *adminRepository) Create(admin *models.Admin) error {
 		return err
 	}
 
-	// Create a unique index for the email field
-	opt := options.Index()
-	opt.SetUnique(true)
-	index := mongo.IndexModel{Keys: bson.M{"email": 1}, Options: opt}
-
-	if _, err := ur.collection.Indexes().CreateOne(ctx, index); err != nil {
-		return errors.New("could not create index for email")
-	}
-
 	return nil
 }
 

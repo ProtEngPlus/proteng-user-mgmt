@@ -1,52 +1,29 @@
 # Contributing
 
-## Commit messages
+กติกาเรื่อง branch, commit message, PR และ docs ของทุก repo อยู่ที่ [CONTRIBUTING.md ของ hub](https://github.com/ProtEngPlus/manual-guides-2023/blob/main/CONTRIBUTING.md) หน้านี้มีเฉพาะเรื่องของ proteng-user-mgmt
 
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
+- แตก branch จาก `dev` และเปิด PR เข้า `dev` push เข้า `dev` จะ deploy ขึ้น dev ทันที และ push เข้า `main` จะ deploy ขึ้น production ทันที
+- รัน `make check` ก่อน push ทุกครั้ง คำสั่งนี้ตรวจ gofmt, `go vet` และ `go test`
+- ฟังก์ชันใหม่ต้องมี test ใน `_test.go` ของ package เดียวกัน และอยู่ใน commit เดียวกัน
+- repo นี้เป็น public ห้ามใส่ credential และรายละเอียดของเครื่องที่ใช้ deploy
+- ห้าม log เนื้อหาอีเมล, token หรือค่าของ SMTP
 
-```
-<type>(<scope>): <short summary>
+## แก้คู่กับ repo อื่น
 
-[optional body]
-```
+ของต่อไปนี้ต้องแก้พร้อมกับอีก repo ในงานชุดเดียวกัน และ PR ของทั้งสองฝั่งต้องใส่ `Related: ProtEngPlus/<repo>#<เลข PR>` ถึงกัน รายการเต็มและลำดับการ merge อยู่ใน [CONTRIBUTING ของ hub](https://github.com/ProtEngPlus/manual-guides-2023/blob/main/CONTRIBUTING.md#ของที่ต้องแก้คู่กันข้าม-repo)
 
-**type** (required):
+- `ACCESS_TOKEN_PRIVATE_KEY` ต้องเป็นคู่กับ `ACCESS_TOKEN_PUBLIC_KEY` ของ bff ใน environment เดียวกัน
+- ลิงก์ในอีเมลที่สร้างจาก `ORIGIN` (เช่น `/reset-password` และ `/success-verified`) ต้องตรงกับ route ใน `src/routes/` ของ frontend
+- path ของ endpoint ที่เปลี่ยนต้องแก้ใน forwarder ของ bff ด้วย และ env ใหม่ต้องเพิ่มใน devops-k8s
 
-- `feat` - new feature
-- `fix` - bug fix
-- `docs` - documentation only
-- `refactor` - code change that neither fixes a bug nor adds a feature
-- `perf` - performance improvement
-- `test` - adding or correcting tests
-- `build` - build system, dependencies
-- `ci` - CI/CD config
-- `chore` - everything else (tooling, config, housekeeping)
-- `revert` - reverts a previous commit
+## hook
 
-**scope** (optional): area of the codebase affected, e.g. `feat(auth): ...`, `fix(conductor): ...`
+`make setup` ติดตั้ง hook ให้ด้วย pre-commit
 
-**summary**: imperative mood, lowercase, no trailing period. e.g. `fix: reconnect rabbitmq on dial failure`
+| ตอน | hook |
+| --- | --- |
+| commit | `gofmt -l -w` และ `go vet` กับไฟล์ Go ที่ staged |
+| push | `go build` และ `go test` เพิ่มจากตอน commit |
+| เขียน commit message | ปฏิเสธ message ที่ไม่ตรงกับ Conventional Commits |
 
-Breaking changes: add `!` after type/scope (`feat!: ...`) or a `BREAKING CHANGE:` footer in the body.
-
-## Branches
-
-- `main` - stable, deployable
-- `dev` - integration branch, merge feature branches here first
-- feature branches: `<type>/<short-description>`, e.g. `feat/lab-results-name`, `fix/mutation-download`
-
-## Pull requests
-
-Use the PR template. Keep PRs scoped to one concern where possible. Squash-merge or use a clean merge commit - avoid merge-commit noise from repeatedly merging `dev` back into a long-lived feature branch.
-
-## Pre-commit hooks
-
-This repo uses [pre-commit](https://pre-commit.com/) (see [SETUP.md](./SETUP.md) to install):
-
-- **pre-commit**: `gofmt -l -w` + `go vet` on staged Go files
-- **pre-push**: additionally runs `go build` and `go test`
-- **commit-msg**: rejects commit messages that don't follow the Conventional Commits format above
-
-`gofmt` and `go vet` also run in CI (`.github/workflows/test-build-dev.yaml`) on every push - skipping hooks locally (`--no-verify`) just means CI catches it instead.
-
-Run everything manually: `pre-commit run --all-files`
+ถ้า gofmt แก้ไฟล์ให้ระหว่าง commit ให้ `git add` ไฟล์นั้นซ้ำแล้ว commit อีกครั้ง ถ้าบน Windows `gofmt -l .` แสดงไฟล์ออกมาเต็มไปหมดทั้งที่ไม่ได้แก้ แปลว่า working tree เป็น CRLF ดูวิธีแก้ในหัวข้อ Line endings ของ CONTRIBUTING ของ hub

@@ -3,12 +3,14 @@ package consumer
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/protengplus/proteng-user-mgmt/configs"
 	"github.com/protengplus/proteng-user-mgmt/internal/logger"
 	"github.com/protengplus/proteng-user-mgmt/models"
 	"github.com/protengplus/proteng-user-mgmt/repositories"
@@ -24,6 +26,7 @@ type Consumer struct {
 
 type Payload struct {
 	UserId    string `json:"user_id"`
+	JobId     string `json:"job_id"`
 	JobName   string `json:"job_name"`
 	JobState  string `json:"job_state"`
 	StageId   string `json:"stage_id"`
@@ -108,7 +111,7 @@ func (c *Consumer) RunConsumer(amqpURL string, queueName string) error {
 					continue
 				}
 
-				SendJobNotificationEmail(user, payload.JobName, payload.JobState, payload.StageId, payload.StageName, c.temp)
+				SendJobNotificationEmail(user, payload.JobId, payload.JobName, payload.JobState, payload.StageId, payload.StageName, c.temp)
 			}
 		}()
 
@@ -131,10 +134,11 @@ func GetUser(userRepository repositories.UserRepository, userId string) (*models
 	return user, nil
 }
 
-func SendJobNotificationEmail(user *models.User, jobName string, jobState string, stageID string, stageName string, temp *template.Template) {
+func SendJobNotificationEmail(user *models.User, jobID string, jobName string, jobState string, stageID string, stageName string, temp *template.Template) {
 	emailData := utils.EmailData{
+		URL:       jobDetailURL(jobID),
 		FirstName: user.Name,
-		Subject:   "Job status notification",
+		Subject:   jobNotificationSubject(jobName, jobState),
 		JobName:   jobName,
 		JobState:  jobState,
 		StageID:   stageID,
@@ -145,5 +149,24 @@ func SendJobNotificationEmail(user *models.User, jobName string, jobState string
 	if err != nil {
 		logger.Errorf("Failed to send email: %v", err)
 		return
+	}
+}
+
+// older conductor messages have no job_id, so fall back to the dashboard
+func jobDetailURL(jobID string) string {
+	if jobID == "" {
+		return configs.Config.Origin + "/dashboard"
+	}
+	return configs.Config.Origin + "/dashboard/job-detail/" + jobID
+}
+
+func jobNotificationSubject(jobName string, jobState string) string {
+	switch jobState {
+	case "COMPLETED":
+		return fmt.Sprintf("Your job \"%s\" has completed", jobName)
+	case "FAILED":
+		return fmt.Sprintf("Your job \"%s\" has failed", jobName)
+	default:
+		return fmt.Sprintf("Update on your job \"%s\"", jobName)
 	}
 }

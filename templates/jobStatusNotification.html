@@ -32,9 +32,92 @@
                     <tr>
                       <td>
                         <p>Hi {{.FirstName}},</p>
+                        {{if eq .JobState "COMPLETED"}}
                         <p>
-                          Your job "{{.JobName}}" is {{.JobState}} on stage
-                          {{.StageID}}: {{.StageName}}. Please log in to check.
+                          Good news! Your job <strong>{{.JobName}}</strong> has
+                          finished the {{.StageName}} stage. The results are
+                          ready for you to review.
+                        </p>
+                        {{else if eq .JobState "FAILED"}}
+                        <p>
+                          Unfortunately, your job
+                          <strong>{{.JobName}}</strong> failed during the
+                          {{.StageName}} stage. Open the job to see what
+                          happened and try again.
+                        </p>
+                        {{else}}
+                        <p>
+                          There is an update on your job
+                          <strong>{{.JobName}}</strong>.
+                        </p>
+                        {{end}}
+                        <table
+                          role="presentation"
+                          border="0"
+                          cellpadding="0"
+                          cellspacing="0"
+                          class="details"
+                        >
+                          <tr>
+                            <td class="details-label">Job</td>
+                            <td>{{.JobName}}</td>
+                          </tr>
+                          <tr>
+                            <td class="details-label">Stage</td>
+                            <td>{{.StageID}} - {{.StageName}}</td>
+                          </tr>
+                          <tr>
+                            <td class="details-label">Status</td>
+                            <td>
+                              {{if eq .JobState "COMPLETED"}}
+                              <span class="status status-completed"
+                                >Completed</span
+                              >
+                              {{else if eq .JobState "FAILED"}}
+                              <span class="status status-failed">Failed</span>
+                              {{else if eq .JobState "ONGOING"}}
+                              <span class="status status-ongoing"
+                                >In progress</span
+                              >
+                              {{else}}
+                              <span class="status">{{.JobState}}</span>
+                              {{end}}
+                            </td>
+                          </tr>
+                        </table>
+                        <table
+                          role="presentation"
+                          border="0"
+                          cellpadding="0"
+                          cellspacing="0"
+                          class="btn btn-primary"
+                        >
+                          <tbody>
+                            <tr>
+                              <td align="left">
+                                <table
+                                  role="presentation"
+                                  border="0"
+                                  cellpadding="0"
+                                  cellspacing="0"
+                                >
+                                  <tbody>
+                                    <tr>
+                                      <td>
+                                        <a href="{{.URL}}" target="_blank"
+                                          >View job</a
+                                        >
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <p class="note">
+                          You are receiving this email because notifications
+                          are turned on for this job.
                         </p>
                         <p>Best regards,<br />Protein Engineering Plus Team</p>
                       </td>

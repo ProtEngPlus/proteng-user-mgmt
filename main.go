@@ -33,12 +33,16 @@ func main() {
 
 	userRepository := repositories.NewUserRepository()
 	adminRepository := repositories.NewAdminRepository()
+	refreshTokenRepository := repositories.NewRefreshTokenRepository()
 
 	if err := userRepository.EnsureIndexes(); err != nil {
 		logger.Zap.Error("failed to ensure user email index", zap.Error(err))
 	}
 	if err := adminRepository.EnsureIndexes(); err != nil {
 		logger.Zap.Error("failed to ensure admin email index", zap.Error(err))
+	}
+	if err := refreshTokenRepository.EnsureIndexes(); err != nil {
+		logger.Zap.Error("failed to ensure refresh token indexes", zap.Error(err))
 	}
 
 	temp := template.Must(template.ParseGlob("templates/*.html"))

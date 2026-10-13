@@ -43,6 +43,7 @@ user-mgmt อ่าน `.env.local` เมื่อรันด้วย `ENV=lo
 | `MONGO_DB` | `proteng_local` | ชื่อ database ถ้าไม่ตั้ง ค่า default ในโค้ดคือ `proteng-dev` |
 | `ACCESS_TOKEN_PRIVATE_KEY` | ใส่ด้วย `make -C ../manual-guides-2023 local-keys` | base64 ของ RSA private key แบบ PEM (PKCS1 หรือ PKCS8) ใช้เซ็น JWT |
 | `ACCESS_TOKEN_EXPIRED_IN` | `1h` | อายุของ access token |
+| `REFRESH_TOKEN_EXPIRED_IN` | `168h` | อายุของ refresh token |
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT` | `noreply@localhost`, `localhost`, `1025` | ผู้ส่งและ SMTP server ค่า local ชี้ไปที่ Mailhog `SMTP_PORT` ต้องเป็นตัวเลข ถ้าว่าง service จะหยุดตั้งแต่เริ่ม |
 | `SMTP_USER`, `SMTP_PASS` | ว่าง | บัญชี SMTP จริง ใช้เฉพาะ dev และ production |
 | `ORIGIN` | `http://localhost:5173` | URL ของหน้าเว็บ ใช้สร้างลิงก์ในอีเมล เช่นลิงก์ยืนยันและลิงก์ reset password |

@@ -297,6 +297,10 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 		return
 	}
 
+	if err := ac.refreshTokenRepository.RevokeAllForSubject(user.Id, time.Now()); err != nil {
+		logger.Errorf("Failed to revoke sessions after password reset for user %s: %v", user.Id.Hex(), err)
+	}
+
 	emailData := utils.EmailData{
 		FirstName: user.Name,
 		Subject:   "Your password has been changed",
@@ -352,6 +356,10 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	if err != nil {
 		apiutil.ApiResponseForbidden(c, err)
 		return
+	}
+
+	if err := ac.refreshTokenRepository.RevokeAllForSubject(user.Id, time.Now()); err != nil {
+		logger.Errorf("Failed to revoke sessions after password change for user %s: %v", user.Id.Hex(), err)
 	}
 
 	emailData := utils.EmailData{

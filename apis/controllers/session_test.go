@@ -200,17 +200,18 @@ func TestRefresh(t *testing.T) {
 	cases := []struct {
 		name        string
 		body        string
-		usedBefore  bool
+		usedAgo     time.Duration
 		want        int
 		wantRevoked bool
 	}{
-		{"valid token rotates in the same family", `{"refresh_token":"valid-token"}`, false, http.StatusOK, false},
-		{"reused token revokes the family", `{"refresh_token":"reused-token"}`, true, http.StatusUnauthorized, true},
-		{"unknown token is rejected", `{"refresh_token":"unknown-token"}`, false, http.StatusUnauthorized, false},
-		{"unverified user is rejected", `{"refresh_token":"unverified-token"}`, false, http.StatusUnauthorized, false},
-		{"user without the role is rejected", `{"refresh_token":"demoted-token"}`, false, http.StatusUnauthorized, false},
-		{"deleted user is rejected", `{"refresh_token":"deleted-token"}`, false, http.StatusUnauthorized, false},
-		{"missing token is rejected", `{}`, false, http.StatusBadRequest, false},
+		{"valid token rotates in the same family", `{"refresh_token":"valid-token"}`, 0, http.StatusOK, false},
+		{"reused token revokes the family", `{"refresh_token":"reused-token"}`, time.Minute, http.StatusUnauthorized, true},
+		{"token used by another tab just now conflicts", `{"refresh_token":"reused-token"}`, 2 * time.Second, http.StatusConflict, false},
+		{"unknown token is rejected", `{"refresh_token":"unknown-token"}`, 0, http.StatusUnauthorized, false},
+		{"unverified user is rejected", `{"refresh_token":"unverified-token"}`, 0, http.StatusUnauthorized, false},
+		{"user without the role is rejected", `{"refresh_token":"demoted-token"}`, 0, http.StatusUnauthorized, false},
+		{"deleted user is rejected", `{"refresh_token":"deleted-token"}`, 0, http.StatusUnauthorized, false},
+		{"missing token is rejected", `{}`, 0, http.StatusBadRequest, false},
 	}
 
 	for _, tc := range cases {
@@ -223,8 +224,13 @@ func TestRefresh(t *testing.T) {
 			}}
 			for raw, user := range tokens {
 				hash := utils.HashRefreshToken(raw)
-				repo.byHash[hash] = &models.RefreshToken{FamilyId: family, SubjectId: user.Id, Role: "user"}
-				repo.consumed[hash] = tc.usedBefore
+				token := &models.RefreshToken{FamilyId: family, SubjectId: user.Id, Role: "user"}
+				if tc.usedAgo > 0 {
+					usedAt := time.Now().Add(-tc.usedAgo)
+					token.RevokedAt = &usedAt
+					repo.consumed[hash] = true
+				}
+				repo.byHash[hash] = token
 			}
 
 			router := gin.New()

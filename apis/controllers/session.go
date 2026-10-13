@@ -18,6 +18,8 @@ import (
 	"github.com/protengplus/proteng-user-mgmt/utils/apiutil"
 )
 
+const refreshReuseGrace = 10 * time.Second
+
 type sessionTokens struct {
 	AccessToken  string
 	RefreshToken string
@@ -68,6 +70,10 @@ func (ac *AuthController) Refresh(c *gin.Context) {
 
 	now := time.Now()
 	old, err := ac.refreshTokenRepository.Consume(utils.HashRefreshToken(input.RefreshToken), now)
+	if errors.Is(err, repositories.ErrRefreshTokenReused) && now.Sub(*old.RevokedAt) <= refreshReuseGrace {
+		apiutil.ApiResponseConflict(c, err, "error: session already refreshed")
+		return
+	}
 	if errors.Is(err, repositories.ErrRefreshTokenReused) {
 		logger.Warnf("refresh token reuse: subject=%s family=%s", old.SubjectId.Hex(), old.FamilyId.Hex())
 		if err := ac.refreshTokenRepository.RevokeFamily(old.FamilyId, now); err != nil {

@@ -17,7 +17,6 @@ type config struct {
 
 	AccessTokenPrivateKey string `envconfig:"ACCESS_TOKEN_PRIVATE_KEY" default:""`
 	AccessTokenExpiredIn  string `envconfig:"ACCESS_TOKEN_EXPIRED_IN" default:"1h"`
-	AccessTokenMaxAge     int    `envconfig:"ACCESS_TOKEN_MAXAGE" default:"3600"`
 
 	MongoUri string `envconfig:"MONGO_URI" default:""`
 	MongoDb  string `envconfig:"MONGO_DB" default:"proteng-dev"`

@@ -141,14 +141,6 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		return
 	}
 
-	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
-	// if err != nil {
-	// 	apiutil.ApiResponseInternalServerError(c, err)
-	// 	return
-	// }
-	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
-
 	resp := models.FilteredResponse(user)
 	resp.AccessToken = accessToken
 	resp.CurrentRole = credentials.Role
@@ -190,14 +182,6 @@ func (ac *AuthController) SignInAdmin(c *gin.Context) {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
-
-	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
-	// if err != nil {
-	// 	apiutil.ApiResponseInternalServerError(c, err)
-	// 	return
-	// }
-	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
 
 	resp := models.FilteredAdminResponse(admin)
 	resp.AccessToken = accessToken
@@ -314,10 +298,6 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
-
-	// c.SetCookie("access_token", "", -1, "/", "localhost", false, true)
-	// c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "", -1, "/", "localhost", false, true)
 
 	emailData := utils.EmailData{
 		FirstName: user.Name,

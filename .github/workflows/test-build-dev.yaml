@@ -18,17 +18,9 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Check gofmt
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "Not gofmt'd:"
-            echo "$unformatted"
-            exit 1
-          fi
-
-      - name: go vet
-        run: go vet ./...
+      # Same target developers run locally: gofmt check, go vet and go test.
+      - name: make check
+        run: make check
 
   build:
     name: Build Image

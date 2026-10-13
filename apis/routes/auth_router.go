@@ -12,6 +12,7 @@ import (
 func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository, temp *template.Template) {
 	ac := controllers.NewAuthController(ur, ar, temp)
 
+	router.POST("/auth/register", ac.RegisterUser)
 	router.POST("/auth/login", ac.SignInUser)
 	router.POST("/auth/login/admin", ac.SignInAdmin)
 	router.POST("/auth/forgotpassword", ac.ForgotPassword)

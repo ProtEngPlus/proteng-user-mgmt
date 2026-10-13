@@ -9,6 +9,7 @@ import (
 	"github.com/protengplus/proteng-user-mgmt/database"
 	"github.com/protengplus/proteng-user-mgmt/internal/logger"
 	"github.com/protengplus/proteng-user-mgmt/repositories"
+	"go.uber.org/zap"
 
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
@@ -25,12 +26,21 @@ func main() {
 	router := gin.New()
 
 	// database
-	err := database.ConnectToDB()
+	err := database.ConnectWithRetry(database.ConnectToDB, 5, 10*time.Second)
 	if err != nil {
 		logrus.Fatalf("Failed to connect to database: %v", err)
 	}
+
 	userRepository := repositories.NewUserRepository()
 	adminRepository := repositories.NewAdminRepository()
+
+	if err := userRepository.EnsureIndexes(); err != nil {
+		logger.Zap.Error("failed to ensure user email index", zap.Error(err))
+	}
+	if err := adminRepository.EnsureIndexes(); err != nil {
+		logger.Zap.Error("failed to ensure admin email index", zap.Error(err))
+	}
+
 	temp := template.Must(template.ParseGlob("templates/*.html"))
 
 	// rabbitmq

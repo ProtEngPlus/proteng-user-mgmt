@@ -7,9 +7,13 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/protengplus/proteng-user-mgmt/configs"
@@ -20,8 +24,10 @@ import (
 
 type fakeRefreshTokenRepository struct {
 	repositories.RefreshTokenRepository
-	created   []*models.RefreshToken
-	createErr error
+	created       []*models.RefreshToken
+	createErr     error
+	byHash        map[string]*models.RefreshToken
+	revokedFamily primitive.ObjectID
 }
 
 func (f *fakeRefreshTokenRepository) Create(token *models.RefreshToken) error {
@@ -29,6 +35,18 @@ func (f *fakeRefreshTokenRepository) Create(token *models.RefreshToken) error {
 		return f.createErr
 	}
 	f.created = append(f.created, token)
+	return nil
+}
+
+func (f *fakeRefreshTokenRepository) FindByHash(hash string) (*models.RefreshToken, error) {
+	if token, ok := f.byHash[hash]; ok {
+		return token, nil
+	}
+	return nil, repositories.ErrRefreshTokenInvalid
+}
+
+func (f *fakeRefreshTokenRepository) RevokeFamily(familyId primitive.ObjectID, now time.Time) error {
+	f.revokedFamily = familyId
 	return nil
 }
 
@@ -90,4 +108,40 @@ func TestIssueSession(t *testing.T) {
 			t.Fatal("issueSession() error = nil, want error")
 		}
 	})
+}
+
+func TestLogout(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	family := primitive.NewObjectID()
+	repo := &fakeRefreshTokenRepository{byHash: map[string]*models.RefreshToken{
+		utils.HashRefreshToken("known-token"): {FamilyId: family},
+	}}
+	router := gin.New()
+	router.POST("/auth/logout", (&AuthController{refreshTokenRepository: repo}).Logout)
+
+	cases := []struct {
+		name        string
+		body        string
+		want        int
+		wantRevoked bool
+	}{
+		{"known token revokes its family", `{"refresh_token":"known-token"}`, http.StatusOK, true},
+		{"unknown token still logs out", `{"refresh_token":"unknown-token"}`, http.StatusOK, false},
+		{"missing token is rejected", `{}`, http.StatusBadRequest, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo.revokedFamily = primitive.NilObjectID
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/auth/logout", strings.NewReader(tc.body)))
+
+			if w.Code != tc.want {
+				t.Fatalf("status = %d, want %d", w.Code, tc.want)
+			}
+			if revoked := repo.revokedFamily == family; revoked != tc.wantRevoked {
+				t.Errorf("family revoked = %v, want %v", revoked, tc.wantRevoked)
+			}
+		})
+	}
 }

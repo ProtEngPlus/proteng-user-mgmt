@@ -65,3 +65,7 @@ type ChangePasswordInput struct {
 type SendVerificationInput struct {
 	Email string `json:"email" binding:"required"`
 }
+
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}

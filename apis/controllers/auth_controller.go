@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thanhpk/randstr"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,18 +26,20 @@ import (
 )
 
 type AuthController struct {
-	userRepository  repositories.UserRepository
-	adminRepository repositories.AdminRepository
-	collection      *mongo.Collection
-	temp            *template.Template
+	userRepository         repositories.UserRepository
+	adminRepository        repositories.AdminRepository
+	refreshTokenRepository repositories.RefreshTokenRepository
+	collection             *mongo.Collection
+	temp                   *template.Template
 }
 
-func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository, temp *template.Template) *AuthController {
+func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository, refreshTokenRepository repositories.RefreshTokenRepository, temp *template.Template) *AuthController {
 	return &AuthController{
-		userRepository:  userRepository,
-		adminRepository: adminRepository,
-		collection:      database.GetCollection("users"),
-		temp:            temp,
+		userRepository:         userRepository,
+		adminRepository:        adminRepository,
+		refreshTokenRepository: refreshTokenRepository,
+		collection:             database.GetCollection("users"),
+		temp:                   temp,
 	}
 }
 
@@ -129,28 +132,15 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		return
 	}
 
-	// Generate Tokens
-	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
+	session, err := ac.issueSession(user.Id, credentials.Role, primitive.NewObjectID())
 	if err != nil {
 		apiutil.ApiResponseInternalServerError(c, err)
-		return // Return an error if parsing fails
-	}
-	accessToken, err := utils.CreateToken(duration, user.Id, credentials.Role, configs.Config.AccessTokenPrivateKey)
-	if err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
 
-	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
-	// if err != nil {
-	// 	apiutil.ApiResponseInternalServerError(c, err)
-	// 	return
-	// }
-	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
-
 	resp := models.FilteredResponse(user)
-	resp.AccessToken = accessToken
+	resp.AccessToken = session.AccessToken
+	resp.RefreshToken = session.RefreshToken
 	resp.CurrentRole = credentials.Role
 
 	apiutil.ApiResponseOk(c, resp)
@@ -190,14 +180,6 @@ func (ac *AuthController) SignInAdmin(c *gin.Context) {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
-
-	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
-	// if err != nil {
-	// 	apiutil.ApiResponseInternalServerError(c, err)
-	// 	return
-	// }
-	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
 
 	resp := models.FilteredAdminResponse(admin)
 	resp.AccessToken = accessToken
@@ -315,9 +297,9 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// c.SetCookie("access_token", "", -1, "/", "localhost", false, true)
-	// c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "", -1, "/", "localhost", false, true)
+	if err := ac.refreshTokenRepository.RevokeAllForSubject(user.Id, time.Now()); err != nil {
+		logger.Errorf("Failed to revoke sessions after password reset for user %s: %v", user.Id.Hex(), err)
+	}
 
 	emailData := utils.EmailData{
 		FirstName: user.Name,
@@ -374,6 +356,10 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	if err != nil {
 		apiutil.ApiResponseForbidden(c, err)
 		return
+	}
+
+	if err := ac.refreshTokenRepository.RevokeAllForSubject(user.Id, time.Now()); err != nil {
+		logger.Errorf("Failed to revoke sessions after password change for user %s: %v", user.Id.Hex(), err)
 	}
 
 	emailData := utils.EmailData{
@@ -492,22 +478,15 @@ func (ac *AuthController) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	// Generate Tokens
-	var duration time.Duration
-	duration, err = time.ParseDuration(configs.Config.AccessTokenExpiredIn)
-
+	session, err := ac.issueSession(user.Id, "user", primitive.NewObjectID())
 	if err != nil {
 		apiutil.ApiResponseInternalServerError(c, err)
-		return // Return an error if parsing fails
-	}
-	accessToken, err := utils.CreateToken(duration, user.Id, "user", configs.Config.AccessTokenPrivateKey)
-	if err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
 
 	resp := models.FilteredResponse(&user)
-	resp.AccessToken = accessToken
+	resp.AccessToken = session.AccessToken
+	resp.RefreshToken = session.RefreshToken
 	resp.CurrentRole = "user"
 
 	apiutil.ApiResponseOk(c, resp, "Email verified successfully")

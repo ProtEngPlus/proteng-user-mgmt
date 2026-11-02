@@ -26,15 +26,16 @@ type SignInInput struct {
 }
 
 type UserResponse struct {
-	ID          primitive.ObjectID `json:"id"`
-	Email       string             `json:"email"`
-	Name        string             `json:"name"`
-	Role        []string           `json:"role"`
-	UserRole    string             `json:"user_role"`
-	Surname     string             `json:"surname"`
-	AccessToken string             `json:"access_token,omitempty"`
-	CurrentRole string             `json:"current_role,omitempty"`
-	IsVerified  bool               `json:"is_verified"`
+	ID           primitive.ObjectID `json:"id"`
+	Email        string             `json:"email"`
+	Name         string             `json:"name"`
+	Role         []string           `json:"role"`
+	UserRole     string             `json:"user_role"`
+	Surname      string             `json:"surname"`
+	AccessToken  string             `json:"access_token,omitempty"`
+	RefreshToken string             `json:"refresh_token,omitempty"`
+	CurrentRole  string             `json:"current_role,omitempty"`
+	IsVerified   bool               `json:"is_verified"`
 }
 
 func FilteredResponse(user *User) UserResponse {
@@ -63,4 +64,8 @@ type ChangePasswordInput struct {
 }
 type SendVerificationInput struct {
 	Email string `json:"email" binding:"required"`
+}
+
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }

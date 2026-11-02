@@ -5,22 +5,31 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/protengplus/proteng-user-mgmt/configs"
+	"github.com/protengplus/proteng-user-mgmt/internal/logger"
 	"github.com/protengplus/proteng-user-mgmt/models"
 	"github.com/protengplus/proteng-user-mgmt/repositories"
 	"github.com/protengplus/proteng-user-mgmt/utils"
 )
+
+func TestMain(m *testing.M) {
+	logger.InitZap()
+	os.Exit(m.Run())
+}
 
 type fakeRefreshTokenRepository struct {
 	repositories.RefreshTokenRepository
@@ -28,6 +37,19 @@ type fakeRefreshTokenRepository struct {
 	createErr     error
 	byHash        map[string]*models.RefreshToken
 	revokedFamily primitive.ObjectID
+	consumed      map[string]bool
+}
+
+type fakeUserRepository struct {
+	repositories.UserRepository
+	users map[string]*models.User
+}
+
+func (f *fakeUserRepository) FindById(id string) (*models.User, error) {
+	if user, ok := f.users[id]; ok {
+		return user, nil
+	}
+	return nil, mongo.ErrNoDocuments
 }
 
 func (f *fakeRefreshTokenRepository) Create(token *models.RefreshToken) error {
@@ -43,6 +65,18 @@ func (f *fakeRefreshTokenRepository) FindByHash(hash string) (*models.RefreshTok
 		return token, nil
 	}
 	return nil, repositories.ErrRefreshTokenInvalid
+}
+
+func (f *fakeRefreshTokenRepository) Consume(hash string, now time.Time) (*models.RefreshToken, error) {
+	token, ok := f.byHash[hash]
+	if !ok {
+		return nil, repositories.ErrRefreshTokenInvalid
+	}
+	if f.consumed[hash] {
+		return token, repositories.ErrRefreshTokenReused
+	}
+	f.consumed[hash] = true
+	return token, nil
 }
 
 func (f *fakeRefreshTokenRepository) RevokeFamily(familyId primitive.ObjectID, now time.Time) error {
@@ -141,6 +175,93 @@ func TestLogout(t *testing.T) {
 			}
 			if revoked := repo.revokedFamily == family; revoked != tc.wantRevoked {
 				t.Errorf("family revoked = %v, want %v", revoked, tc.wantRevoked)
+			}
+		})
+	}
+}
+
+func TestRefresh(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	useTestSigningKey(t)
+
+	family := primitive.NewObjectID()
+	verified := &models.User{Id: primitive.NewObjectID(), Role: []string{"user"}, IsVerified: true}
+	unverified := &models.User{Id: primitive.NewObjectID(), Role: []string{"user"}}
+	demoted := &models.User{Id: primitive.NewObjectID(), Role: []string{"admin"}, IsVerified: true}
+
+	tokens := map[string]*models.User{
+		"valid-token":      verified,
+		"reused-token":     verified,
+		"unverified-token": unverified,
+		"demoted-token":    demoted,
+		"deleted-token":    {Id: primitive.NewObjectID()},
+	}
+
+	cases := []struct {
+		name        string
+		body        string
+		usedAgo     time.Duration
+		want        int
+		wantRevoked bool
+	}{
+		{"valid token rotates in the same family", `{"refresh_token":"valid-token"}`, 0, http.StatusOK, false},
+		{"reused token revokes the family", `{"refresh_token":"reused-token"}`, time.Minute, http.StatusUnauthorized, true},
+		{"token used by another tab just now conflicts", `{"refresh_token":"reused-token"}`, 2 * time.Second, http.StatusConflict, false},
+		{"unknown token is rejected", `{"refresh_token":"unknown-token"}`, 0, http.StatusUnauthorized, false},
+		{"unverified user is rejected", `{"refresh_token":"unverified-token"}`, 0, http.StatusUnauthorized, false},
+		{"user without the role is rejected", `{"refresh_token":"demoted-token"}`, 0, http.StatusUnauthorized, false},
+		{"deleted user is rejected", `{"refresh_token":"deleted-token"}`, 0, http.StatusUnauthorized, false},
+		{"missing token is rejected", `{}`, 0, http.StatusBadRequest, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &fakeRefreshTokenRepository{byHash: map[string]*models.RefreshToken{}, consumed: map[string]bool{}}
+			users := &fakeUserRepository{users: map[string]*models.User{
+				verified.Id.Hex():   verified,
+				unverified.Id.Hex(): unverified,
+				demoted.Id.Hex():    demoted,
+			}}
+			for raw, user := range tokens {
+				hash := utils.HashRefreshToken(raw)
+				token := &models.RefreshToken{FamilyId: family, SubjectId: user.Id, Role: "user"}
+				if tc.usedAgo > 0 {
+					usedAt := time.Now().Add(-tc.usedAgo)
+					token.RevokedAt = &usedAt
+					repo.consumed[hash] = true
+				}
+				repo.byHash[hash] = token
+			}
+
+			router := gin.New()
+			router.POST("/auth/refresh", (&AuthController{userRepository: users, refreshTokenRepository: repo}).Refresh)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/auth/refresh", strings.NewReader(tc.body)))
+
+			if w.Code != tc.want {
+				t.Fatalf("status = %d, want %d: %s", w.Code, tc.want, w.Body.String())
+			}
+			if revoked := repo.revokedFamily == family; revoked != tc.wantRevoked {
+				t.Errorf("family revoked = %v, want %v", revoked, tc.wantRevoked)
+			}
+			if tc.want != http.StatusOK {
+				if len(repo.created) != 0 {
+					t.Errorf("issued %d tokens on a rejected refresh", len(repo.created))
+				}
+				return
+			}
+
+			var body struct {
+				Data models.SessionTokensResponse `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if body.Data.AccessToken == "" || body.Data.RefreshToken == "" || body.Data.RefreshToken == "valid-token" {
+				t.Errorf("unexpected tokens %+v", body.Data)
+			}
+			if len(repo.created) != 1 || repo.created[0].FamilyId != family || repo.created[0].SubjectId != verified.Id {
+				t.Errorf("new token not stored in the same family: %+v", repo.created)
 			}
 		})
 	}

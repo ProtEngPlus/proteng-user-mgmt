@@ -69,3 +69,8 @@ type SendVerificationInput struct {
 type RefreshTokenInput struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
+
+type SessionTokensResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}

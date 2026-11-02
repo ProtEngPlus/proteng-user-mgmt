@@ -60,3 +60,55 @@ func TestApiResponseConflict(t *testing.T) {
 		})
 	}
 }
+
+func TestApiResponseUnauthorized(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	testCases := []struct {
+		name            string
+		messages        []string
+		expectedMessage string
+	}{
+		{
+			name:            "with message",
+			messages:        []string{"error: session expired"},
+			expectedMessage: "error: session expired",
+		},
+		{
+			name:            "without message",
+			messages:        nil,
+			expectedMessage: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+
+			ApiResponseUnauthorized(c, errors.New("invalid token"), tc.messages...)
+
+			if recorder.Code != http.StatusUnauthorized {
+				t.Errorf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+			}
+			if !c.IsAborted() {
+				t.Errorf("context not aborted")
+			}
+
+			var body models.HttpResponseError
+			if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+				t.Fatalf("could not unmarshal response body: %v", err)
+			}
+
+			if body.Code != http.StatusUnauthorized {
+				t.Errorf("body code = %d, want %d", body.Code, http.StatusUnauthorized)
+			}
+			if body.Error != "invalid token" {
+				t.Errorf("body error = %q, want %q", body.Error, "invalid token")
+			}
+			if body.Message != tc.expectedMessage {
+				t.Errorf("body message = %q, want %q", body.Message, tc.expectedMessage)
+			}
+		})
+	}
+}

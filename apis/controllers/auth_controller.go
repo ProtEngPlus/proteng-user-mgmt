@@ -260,6 +260,13 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 	apiutil.ApiResponseOk(c, userCredential, message)
 }
 
+func passwordResetTokenQuery(resetToken string, now time.Time) bson.D {
+	return bson.D{
+		{Key: "passwordResetToken", Value: utils.Encode(resetToken)},
+		{Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: now}}},
+	}
+}
+
 func (ac *AuthController) ResetPassword(c *gin.Context) {
 	resetToken := c.Params.ByName("resetToken")
 	var userCredential *models.ResetPasswordInput
@@ -277,10 +284,8 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 
 	hashedPassword, _ := utils.HashPassword(userCredential.Password)
 
-	passwordResetToken := utils.Encode(resetToken)
-
 	// Update User in Database
-	query := bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: time.Now()}}}}
+	query := passwordResetTokenQuery(resetToken, time.Now())
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}, {Key: "$unset", Value: bson.D{{Key: "passwordResetToken", Value: ""}, {Key: "passwordResetTokenExpire", Value: ""}}}}
 
 	var user models.User

@@ -50,6 +50,8 @@ const passwordResetTokenMinutesTTL = 15
 const verificationResendCooldown = 60 * time.Second
 const passwordResetResendCooldown = 60 * time.Second
 
+var errPasswordResetFailed = errors.New("could not send password reset email")
+
 func verificationResendWait(tokenExpire, now time.Time) time.Duration {
 	lastSent := tokenExpire.Add(-verificationTokenDaysTTL * 24 * time.Hour)
 	if wait := verificationResendCooldown - now.Sub(lastSent); wait > 0 {
@@ -255,13 +257,13 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 			apiutil.ApiResponseOk(c, userCredential, message)
 			return
 		}
-		apiutil.ApiResponseBadGateway(c, err)
+		logger.Errorf("Failed to look up user for password reset: %v", err)
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
 		return
 	}
 
 	if !user.IsVerified {
-		err := errors.New("email not verified")
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: email not verified")
+		apiutil.ApiResponseOk(c, userCredential, message)
 		return
 	}
 
@@ -292,12 +294,13 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
 	if err != nil {
-		apiutil.ApiResponseForbidden(c, err)
+		logger.Errorf("Failed to store password reset token: %v", err)
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
 		return
 	}
 
 	if result.MatchedCount == 0 {
-		apiutil.ApiResponseBadGateway(c, errors.New("user not found"), "There was an error sending email")
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
 		return
 	}
 
@@ -311,9 +314,15 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 
 	err = utils.SendEmail(user, &emailData, ac.temp, "resetPassword.html")
 	if err != nil {
-		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
+		logger.Errorf("Failed to send password reset email: %v", err)
+		clear := bson.D{{Key: "$unset", Value: bson.D{{Key: "passwordResetToken", Value: ""}, {Key: "passwordResetTokenExpire", Value: ""}}}}
+		if _, clearErr := ac.collection.UpdateOne(context.Background(), query, clear); clearErr != nil {
+			logger.Errorf("Failed to clear password reset token: %v", clearErr)
+		}
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
 		return
 	}
+
 	apiutil.ApiResponseOk(c, userCredential, message)
 }
 

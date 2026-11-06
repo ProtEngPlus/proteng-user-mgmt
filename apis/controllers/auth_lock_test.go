@@ -231,3 +231,37 @@ func TestChangePasswordLock(t *testing.T) {
 		t.Errorf("status = %d, want 429", w.Code)
 	}
 }
+
+func TestForgotPasswordSameResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	forgot := func(user *models.User) *httptest.ResponseRecorder {
+		ac := &AuthController{userRepository: &fakeLoginUserRepository{user: user}}
+		return postLogin(ac.ForgotPassword, `{"email":"a@b.com"}`)
+	}
+
+	noAccount := forgot(nil)
+	if noAccount.Code != http.StatusOK {
+		t.Fatalf("no account status = %d, want 200", noAccount.Code)
+	}
+
+	cases := []struct {
+		name string
+		user *models.User
+	}{
+		{"email not verified", &models.User{Email: "a@b.com", IsVerified: false}},
+		{"inside the cooldown", &models.User{
+			Email:                    "a@b.com",
+			IsVerified:               true,
+			PasswordResetTokenExpire: time.Now().Add(passwordResetTokenMinutesTTL * time.Minute),
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := forgot(tc.user)
+			if w.Code != noAccount.Code || w.Body.String() != noAccount.Body.String() {
+				t.Errorf("got %d %s, want %d %s", w.Code, w.Body, noAccount.Code, noAccount.Body)
+			}
+		})
+	}
+}

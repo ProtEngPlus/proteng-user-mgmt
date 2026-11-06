@@ -48,6 +48,7 @@ func NewAuthController(userRepository repositories.UserRepository, adminReposito
 const verificationTokenDaysTTL = 7
 const passwordResetTokenMinutesTTL = 15
 const verificationResendCooldown = 60 * time.Second
+const passwordResetResendCooldown = 60 * time.Second
 
 func verificationResendWait(tokenExpire, now time.Time) time.Duration {
 	lastSent := tokenExpire.Add(-verificationTokenDaysTTL * 24 * time.Hour)
@@ -97,6 +98,14 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 	}
 
 	apiutil.ApiResponseOk(c, models.FilteredResponse(&user), "Verification email sent")
+}
+
+func passwordResetResendWait(tokenExpire, now time.Time) time.Duration {
+	lastSent := tokenExpire.Add(-passwordResetTokenMinutesTTL * time.Minute)
+	if wait := passwordResetResendCooldown - now.Sub(lastSent); wait > 0 {
+		return wait
+	}
+	return 0
 }
 
 func authRetryAfterSeconds(wait time.Duration) int {
@@ -253,6 +262,11 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 	if !user.IsVerified {
 		err := errors.New("email not verified")
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: email not verified")
+		return
+	}
+
+	if passwordResetResendWait(user.PasswordResetTokenExpire, time.Now()) > 0 {
+		apiutil.ApiResponseOk(c, userCredential, message)
 		return
 	}
 

@@ -267,6 +267,25 @@ func passwordResetTokenQuery(resetToken string, now time.Time) bson.D {
 	}
 }
 
+func (ac *AuthController) CheckResetToken(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), database.QueryTimeout)
+	defer cancel()
+
+	query := passwordResetTokenQuery(c.Params.ByName("resetToken"), time.Now())
+	count, err := ac.collection.CountDocuments(ctx, query, options.Count().SetLimit(1))
+	if err != nil {
+		logger.Errorf("Failed to check password reset token: %v", err)
+		apiutil.ApiResponseInternalServerError(c, errors.New("could not check token"))
+		return
+	}
+	if count == 0 {
+		apiutil.ApiResponseErrorBadRequest(c, fmt.Errorf("invalid token"), "Token is invalid or has expired")
+		return
+	}
+
+	apiutil.ApiResponseOk(c, nil, "Token is valid")
+}
+
 func (ac *AuthController) ResetPassword(c *gin.Context) {
 	resetToken := c.Params.ByName("resetToken")
 	var userCredential *models.ResetPasswordInput

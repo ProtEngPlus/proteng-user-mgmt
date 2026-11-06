@@ -275,7 +275,7 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 	// Generate Verification Code
 	resetToken := randstr.String(20)
 
-	passwordResetToken := utils.Encode(resetToken)
+	passwordResetToken := utils.HashResetToken(resetToken)
 
 	// Update User in Database
 	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(userCredential.Email)}}
@@ -328,7 +328,7 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 
 func passwordResetTokenQuery(resetToken string, now time.Time) bson.D {
 	return bson.D{
-		{Key: "passwordResetToken", Value: utils.Encode(resetToken)},
+		{Key: "passwordResetToken", Value: utils.HashResetToken(resetToken)},
 		{Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: now}}},
 	}
 }

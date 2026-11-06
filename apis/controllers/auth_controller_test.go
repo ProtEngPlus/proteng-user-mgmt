@@ -70,8 +70,8 @@ func TestPasswordResetTokenQuery(t *testing.T) {
 	if len(query) != 2 {
 		t.Fatalf("query has %d conditions, want 2", len(query))
 	}
-	if query[0].Key != "passwordResetToken" || query[0].Value != utils.Encode("raw-token") {
-		t.Errorf("token condition = %v, want the encoded token", query[0])
+	if query[0].Key != "passwordResetToken" || query[0].Value != utils.HashResetToken("raw-token") {
+		t.Errorf("token condition = %v, want the hashed token", query[0])
 	}
 	if query[0].Value == "raw-token" {
 		t.Error("query must not use the raw token")

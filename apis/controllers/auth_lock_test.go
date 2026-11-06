@@ -192,3 +192,42 @@ func TestSignInAdminLock(t *testing.T) {
 		t.Errorf("status = %d, want 429", w.Code)
 	}
 }
+
+func TestChangePasswordLock(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	hashed, err := utils.HashPassword("Current-password-1")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	userID := primitive.NewObjectID()
+	attempts := newFakeAuthAttempts()
+	ac := &AuthController{
+		userRepository: &fakeUserRepository{users: map[string]*models.User{
+			userID.Hex(): {Id: userID, Password: hashed},
+		}},
+		authAttemptRepository: attempts,
+	}
+	change := func(current string) *httptest.ResponseRecorder {
+		router := gin.New()
+		router.PATCH("/changepassword/:id", ac.ChangePassword)
+		w := httptest.NewRecorder()
+		body := `{"current_password":"` + current + `","new_password":"New-password-1"}`
+		req := httptest.NewRequest(http.MethodPatch, "/changepassword/"+userID.Hex(), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		return w
+	}
+
+	for i := 0; i < testMaxFailures; i++ {
+		if w := change("wrong"); w.Code != http.StatusBadRequest {
+			t.Fatalf("attempt %d status = %d, want 400", i+1, w.Code)
+		}
+	}
+	if got := attempts.failures["change-password:"+userID.Hex()]; got != testMaxFailures {
+		t.Errorf("failures = %d, want %d", got, testMaxFailures)
+	}
+	if w := change("Current-password-1"); w.Code != http.StatusTooManyRequests {
+		t.Errorf("status = %d, want 429", w.Code)
+	}
+}

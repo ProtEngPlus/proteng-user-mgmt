@@ -368,8 +368,14 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		return
 	}
 
+	attemptKey := "change-password:" + user.Id.Hex()
+	if ac.authLocked(c, attemptKey) {
+		return
+	}
+
 	// Validate Current Password
 	if err := utils.VerifyPassword(user.Password, userCredential.CurrentPassword); err != nil {
+		ac.recordAuthFailure(attemptKey)
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: incorrect current password")
 		return
 	}
@@ -401,6 +407,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		return
 	}
 
+	ac.resetAuthFailures(attemptKey)
 	if err := ac.refreshTokenRepository.RevokeAllForSubject(user.Id, time.Now()); err != nil {
 		logger.Errorf("Failed to revoke sessions after password change for user %s: %v", user.Id.Hex(), err)
 	}

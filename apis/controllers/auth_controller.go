@@ -277,16 +277,16 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 		}}}
 
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
-
-	if result.MatchedCount == 0 {
-		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
-		return
-	}
-
 	if err != nil {
 		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
+
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseBadGateway(c, errors.New("user not found"), "There was an error sending email")
+		return
+	}
+
 	// Send Email
 	emailData := utils.EmailData{
 		URL:           configs.Config.Origin + "/reset-password?token=" + resetToken,
@@ -396,14 +396,13 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	defer cancel()
 
 	result, err := ac.collection.UpdateOne(ctx, query, update)
-
-	if result.MatchedCount == 0 {
-		apiutil.ApiResponseErrorBadRequest(c, err, "Cannot update password")
+	if err != nil {
+		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
 
-	if err != nil {
-		apiutil.ApiResponseForbidden(c, err)
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseErrorBadRequest(c, errors.New("user not found"), "Cannot update password")
 		return
 	}
 
@@ -471,16 +470,16 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 			},
 		}}}
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
-
-	if result.MatchedCount == 0 {
-		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
-		return
-	}
-
 	if err != nil {
 		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
+
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseBadGateway(c, errors.New("user not found"), "There was an error sending email")
+		return
+	}
+
 	// Send Email
 	emailData := utils.EmailData{
 		URL:        configs.Config.Origin + "/success-verified?token=" + verificationToken,

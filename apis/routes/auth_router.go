@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository, rr repositories.RefreshTokenRepository, temp *template.Template) {
-	ac := controllers.NewAuthController(ur, ar, rr, temp)
+func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository, rr repositories.RefreshTokenRepository, aar repositories.AuthAttemptRepository, temp *template.Template) {
+	ac := controllers.NewAuthController(ur, ar, rr, aar, temp)
 
 	router.POST("/auth/register", ac.RegisterUser)
 	router.POST("/auth/login", ac.SignInUser)

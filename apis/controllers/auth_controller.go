@@ -29,15 +29,17 @@ type AuthController struct {
 	userRepository         repositories.UserRepository
 	adminRepository        repositories.AdminRepository
 	refreshTokenRepository repositories.RefreshTokenRepository
+	authAttemptRepository  repositories.AuthAttemptRepository
 	collection             *mongo.Collection
 	temp                   *template.Template
 }
 
-func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository, refreshTokenRepository repositories.RefreshTokenRepository, temp *template.Template) *AuthController {
+func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository, refreshTokenRepository repositories.RefreshTokenRepository, authAttemptRepository repositories.AuthAttemptRepository, temp *template.Template) *AuthController {
 	return &AuthController{
 		userRepository:         userRepository,
 		adminRepository:        adminRepository,
 		refreshTokenRepository: refreshTokenRepository,
+		authAttemptRepository:  authAttemptRepository,
 		collection:             database.GetCollection("users"),
 		temp:                   temp,
 	}
@@ -97,6 +99,36 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 	apiutil.ApiResponseOk(c, models.FilteredResponse(&user), "Verification email sent")
 }
 
+func authRetryAfterSeconds(wait time.Duration) int {
+	return int(math.Ceil(wait.Seconds()))
+}
+
+func (ac *AuthController) authLocked(c *gin.Context, key string) bool {
+	wait, err := ac.authAttemptRepository.Wait(key, time.Now())
+	if err != nil {
+		logger.Errorf("Failed to check auth attempts: %v", err)
+		apiutil.ApiResponseInternalServerError(c, errors.New("could not check auth attempts"))
+		return true
+	}
+	if wait > 0 {
+		apiutil.ApiResponseTooManyRequests(c, authRetryAfterSeconds(wait), "error: too many failed attempts")
+		return true
+	}
+	return false
+}
+
+func (ac *AuthController) recordAuthFailure(key string) {
+	if err := ac.authAttemptRepository.RecordFailure(key, time.Now()); err != nil {
+		logger.Errorf("Failed to record auth failure: %v", err)
+	}
+}
+
+func (ac *AuthController) resetAuthFailures(key string) {
+	if err := ac.authAttemptRepository.Reset(key); err != nil {
+		logger.Errorf("Failed to reset auth failures: %v", err)
+	}
+}
+
 func (ac *AuthController) SignInUser(c *gin.Context) {
 	var credentials *models.SignInInput
 
@@ -105,9 +137,15 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		return
 	}
 
+	attemptKey := "login:" + utils.NormalizeEmail(credentials.Email)
+	if ac.authLocked(c, attemptKey) {
+		return
+	}
+
 	user, err := ac.userRepository.FindByEmail(credentials.Email)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
+			ac.recordAuthFailure(attemptKey)
 			apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 			return
 		}
@@ -117,20 +155,17 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 
 	if !slices.Contains(user.Role, credentials.Role) {
 		err := errors.New("invalid role")
+		ac.recordAuthFailure(attemptKey)
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
 
 	if err := utils.VerifyPassword(user.Password, credentials.Password); err != nil {
+		ac.recordAuthFailure(attemptKey)
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
-
-	if !user.IsVerified {
-		err := errors.New("email not verified")
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: email not verified")
-		return
-	}
+	ac.resetAuthFailures(attemptKey)
 
 	session, err := ac.issueSession(user.Id, credentials.Role, primitive.NewObjectID())
 	if err != nil {
@@ -154,9 +189,15 @@ func (ac *AuthController) SignInAdmin(c *gin.Context) {
 		return
 	}
 
+	attemptKey := "login-admin:" + utils.NormalizeEmail(credentials.Email)
+	if ac.authLocked(c, attemptKey) {
+		return
+	}
+
 	admin, err := ac.adminRepository.FindByEmail(credentials.Email)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
+			ac.recordAuthFailure(attemptKey)
 			apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 			return
 		}
@@ -165,9 +206,11 @@ func (ac *AuthController) SignInAdmin(c *gin.Context) {
 	}
 
 	if err := utils.VerifyPassword(admin.Password, credentials.Password); err != nil {
+		ac.recordAuthFailure(attemptKey)
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
+	ac.resetAuthFailures(attemptKey)
 
 	// Generate Tokens
 	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)

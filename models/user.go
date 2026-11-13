@@ -17,6 +17,8 @@ type User struct {
 	IsVerified                   bool               `bson:"is_verified" json:"is_verified"`
 	EmailVerificationToken       string             `bson:"emailVerificationToken,omitempty" json:"-"`
 	EmailVerificationTokenExpire time.Time          `bson:"emailVerificationTokenExpire,omitempty" json:"-"`
+	PasswordResetToken           string             `bson:"passwordResetToken,omitempty" json:"-"`
+	PasswordResetTokenExpire     time.Time          `bson:"passwordResetTokenExpire,omitempty" json:"-"`
 }
 
 type SignInInput struct {

@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository, rr repositories.RefreshTokenRepository, temp *template.Template) {
-	ac := controllers.NewAuthController(ur, ar, rr, temp)
+func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositories.AdminRepository, rr repositories.RefreshTokenRepository, aar repositories.AuthAttemptRepository, temp *template.Template) {
+	ac := controllers.NewAuthController(ur, ar, rr, aar, temp)
 
 	router.POST("/auth/register", ac.RegisterUser)
 	router.POST("/auth/login", ac.SignInUser)
@@ -18,6 +18,7 @@ func AuthRoute(router *gin.Engine, ur repositories.UserRepository, ar repositori
 	router.POST("/auth/refresh", ac.Refresh)
 	router.POST("/auth/logout", ac.Logout)
 	router.POST("/auth/forgotpassword", ac.ForgotPassword)
+	router.GET("/auth/resetpassword/:resetToken", ac.CheckResetToken)
 	router.PATCH("/auth/resetpassword/:resetToken", ac.ResetPassword)
 	router.PATCH("/auth/changepassword/:id", ac.ChangePassword)
 	router.POST("/auth/sentverification", ac.SendVerification)

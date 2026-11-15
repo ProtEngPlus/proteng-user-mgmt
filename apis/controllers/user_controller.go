@@ -53,11 +53,13 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 		apiutil.ApiResponseNotFound(c, err)
 		return
 	}
-	err = c.BindJSON(&user)
-	if err != nil {
+
+	var in models.UpdateUserInput
+	if err := c.ShouldBindJSON(&in); err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
 		return
 	}
+	in.ApplyTo(user)
 
 	err = uc.userRepository.Update(id, user)
 	if err != nil {

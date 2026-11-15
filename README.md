@@ -1,6 +1,6 @@
 # proteng-user-mgmt
 
-proteng-user-mgmt ดูแลบัญชีของ ProtEngPlus ได้แก่ การสมัครสมาชิก, การยืนยันอีเมล, การ login ที่ออก JWT, การลืมและเปลี่ยนรหัสผ่าน และบัญชี admin นอกจากนี้ยังอ่าน queue `job_status_email_notification` เพื่อส่งอีเมลแจ้งผลของ job service นี้ถูกเรียกจาก [proteng-bff](https://github.com/ProtEngPlus/proteng-bff) เท่านั้น ภาพรวมของระบบอยู่ที่ [manual-guides-2023](https://github.com/ProtEngPlus/manual-guides-2023/blob/main/reference/architecture.md)
+proteng-user-mgmt ดูแลบัญชีของ ProtEngPlus ได้แก่ การสมัครสมาชิก, การยืนยันอีเมล, การ login ที่ออก JWT, และการลืมและเปลี่ยนรหัสผ่าน นอกจากนี้ยังอ่าน queue `job_status_email_notification` เพื่อส่งอีเมลแจ้งผลของ job service นี้ถูกเรียกจาก [proteng-bff](https://github.com/ProtEngPlus/proteng-bff) เท่านั้น ภาพรวมของระบบอยู่ที่ [manual-guides-2023](https://github.com/ProtEngPlus/manual-guides-2023/blob/main/reference/architecture.md)
 
 ## เริ่มใช้
 
@@ -52,8 +52,8 @@ user-mgmt อ่าน `.env.local` เมื่อรันด้วย `ENV=lo
 
 | ที่อยู่ | มีอะไร |
 | --- | --- |
-| `apis/routes/`, `apis/controllers/` | endpoint ของ `/auth/*`, `/users/*` และ `/admins/*` |
-| `models/`, `repositories/` | struct ของ user และ admin และการอ่านเขียน MongoDB `EnsureIndexes` สร้าง unique index ของ email ตอนเริ่ม |
+| `apis/routes/`, `apis/controllers/` | endpoint ของ `/auth/*` และ `/users/*` |
+| `models/`, `repositories/` | struct ของ user และการอ่านเขียน MongoDB `EnsureIndexes` สร้าง unique index ของ email ตอนเริ่ม |
 | `internal/rabbitmq/consumer/` | อ่าน `JOB_QUEUE` แล้วส่งอีเมลแจ้งผลของ job ตามการตั้งค่าของผู้ใช้ |
 | `utils/email.go` | `SendEmail` สร้างอีเมลจาก template แล้วส่งผ่าน SMTP |
 | `utils/token.go`, `utils/password.go` | สร้าง JWT และ hash รหัสผ่าน |

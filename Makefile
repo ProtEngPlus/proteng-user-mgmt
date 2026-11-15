@@ -1,4 +1,4 @@
-# proteng-user-mgmt: auth, users and admins, and notification email.
+# proteng-user-mgmt: auth, users, and notification email
 # Run `make` to list targets. Works from Git Bash, cmd or PowerShell (needs Git for Windows).
 
 # On Windows, `bash` found from cmd or PowerShell is often the WSL launcher

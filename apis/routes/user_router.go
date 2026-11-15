@@ -10,7 +10,6 @@ import (
 func UserRoute(router *gin.Engine, ur repositories.UserRepository) {
 	uc := controllers.NewUserController(ur)
 
-	router.GET("/users", uc.GetAllUsers)
 	router.GET("/users/:id", uc.GetUser)
 	router.PUT("/users/:id", uc.UpdateUser)
 	router.DELETE("/users/:id", uc.DeleteUser)

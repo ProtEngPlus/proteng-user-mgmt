@@ -77,7 +77,6 @@ func main() {
 	// routes
 	routes.UserRoute(router, userRepository)
 	routes.AuthRoute(router, userRepository, adminRepository, refreshTokenRepository, authAttemptRepository, temp)
-	routes.AdminRoute(router, adminRepository)
 
 	// panic recovery
 	router.Use(ginzap.RecoveryWithZap(logger.Zap, true))

@@ -1,6 +1,6 @@
 # Backfill Email Lowercase
 
-Script สำหรับแก้ field `email` ใน collection `users` และ `admins` ให้เป็นตัวพิมพ์เล็กทั้งหมด ให้ตรงกับกฎ `NormalizeEmail` ที่ฝั่ง app บังคับใช้อยู่แล้ว
+Script สำหรับแก้ field `email` ใน collection `users` ให้เป็นตัวพิมพ์เล็กทั้งหมด ให้ตรงกับกฎ `NormalizeEmail` ที่ฝั่ง app บังคับใช้อยู่แล้ว
 
 ## รันตอนไหน
 
@@ -17,7 +17,7 @@ ENV=local go run ./cmd/backfill-lowercase-emails -collection=all
 
 Flag ที่มี:
 
-- `-collection` - `users`, `admins`, หรือ `all` (default `all`)
+- `-collection` - `users`, หรือ `all` (default `all`)
 - `-dry-run` - `true` (default, ไม่เขียนข้อมูลจริง) หรือ `false` (apply ของจริง)
 
 ถ้าเจอ email ซ้ำกันคนละตัวพิมพ์ script จะหยุดทำงานทันทีโดยไม่แก้อะไรเลย - ต้องไปจัดการเอง (merge หรือลบ account ที่ซ้ำ) ก่อนรันใหม่

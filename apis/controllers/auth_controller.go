@@ -61,11 +61,12 @@ func verificationResendWait(tokenExpire, now time.Time) time.Duration {
 }
 
 func (ac *AuthController) RegisterUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var in models.RegisterInput
+	if err := c.ShouldBindJSON(&in); err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
 		return
 	}
+	user := in.ToUser()
 
 	// Validate Password
 	if err := utils.ValidatePasswordStrength(user.Password); err != nil {

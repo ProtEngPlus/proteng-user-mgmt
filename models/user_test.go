@@ -68,8 +68,13 @@ func TestUpdateUserInputApplyTo(t *testing.T) {
 		},
 		{
 			name: "all profile fields sent",
-			body: `{"email":"new@b.com","name":"N","surname":"S","user_role":"staff"}`,
-			want: User{Email: "new@b.com", Password: "$2a$10$hashedvalue", Name: "N", Surname: "S", Role: []string{"user"}, UserRole: "staff"},
+			body: `{"name":"N","surname":"S","user_role":"staff"}`,
+			want: User{Email: "old@b.com", Password: "$2a$10$hashedvalue", Name: "N", Surname: "S", Role: []string{"user"}, UserRole: "staff"},
+		},
+		{
+			name: "email is ignored",
+			body: `{"email":"new@b.com","name":"N"}`,
+			want: User{Email: "old@b.com", Password: "$2a$10$hashedvalue", Name: "N", Surname: "Name", Role: []string{"user"}, UserRole: "student"},
 		},
 	}
 

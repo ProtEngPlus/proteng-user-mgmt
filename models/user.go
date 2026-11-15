@@ -41,16 +41,12 @@ func (in RegisterInput) ToUser() User {
 }
 
 type UpdateUserInput struct {
-	Email    *string `json:"email"`
 	Name     *string `json:"name"`
 	Surname  *string `json:"surname"`
 	UserRole *string `json:"user_role"`
 }
 
 func (in UpdateUserInput) ApplyTo(u *User) {
-	if in.Email != nil {
-		u.Email = *in.Email
-	}
 	if in.Name != nil {
 		u.Name = *in.Name
 	}

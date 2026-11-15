@@ -22,7 +22,6 @@ type UserRepository interface {
 	FindById(id string) (*models.User, error)
 	Update(id string, user *models.User) error
 	Delete(id string) error
-	GetAll() ([]*models.User, error)
 	FindByEmail(email string) (*models.User, error)
 	EnsureIndexes() error
 }
@@ -33,34 +32,6 @@ type userRepository struct {
 
 func NewUserRepository() UserRepository {
 	return &userRepository{collection: database.GetCollection("users")}
-}
-
-func (ur *userRepository) GetAll() ([]*models.User, error) {
-	var users []*models.User
-
-	ctx, cancel := context.WithTimeout(context.Background(), database.QueryTimeout)
-	defer cancel()
-
-	cursor, err := ur.collection.Find(ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-
-	defer cursor.Close(ctx)
-
-	for cursor.Next(ctx) {
-		var user models.User
-		if err := cursor.Decode(&user); err != nil {
-			return nil, err
-		}
-		users = append(users, &user)
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-
-	return users, nil
 }
 
 func (ur *userRepository) FindById(id string) (*models.User, error) {

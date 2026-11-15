@@ -27,17 +27,15 @@ import (
 
 type AuthController struct {
 	userRepository         repositories.UserRepository
-	adminRepository        repositories.AdminRepository
 	refreshTokenRepository repositories.RefreshTokenRepository
 	authAttemptRepository  repositories.AuthAttemptRepository
 	collection             *mongo.Collection
 	temp                   *template.Template
 }
 
-func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository, refreshTokenRepository repositories.RefreshTokenRepository, authAttemptRepository repositories.AuthAttemptRepository, temp *template.Template) *AuthController {
+func NewAuthController(userRepository repositories.UserRepository, refreshTokenRepository repositories.RefreshTokenRepository, authAttemptRepository repositories.AuthAttemptRepository, temp *template.Template) *AuthController {
 	return &AuthController{
 		userRepository:         userRepository,
-		adminRepository:        adminRepository,
 		refreshTokenRepository: refreshTokenRepository,
 		authAttemptRepository:  authAttemptRepository,
 		collection:             database.GetCollection("users"),
@@ -189,55 +187,6 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 	resp.AccessToken = session.AccessToken
 	resp.RefreshToken = session.RefreshToken
 	resp.CurrentRole = credentials.Role
-
-	apiutil.ApiResponseOk(c, resp)
-}
-
-func (ac *AuthController) SignInAdmin(c *gin.Context) {
-	var credentials *models.SignInAdminInput
-
-	if err := c.ShouldBindJSON(&credentials); err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
-		return
-	}
-
-	attemptKey := "login-admin:" + utils.NormalizeEmail(credentials.Email)
-	if ac.authLocked(c, attemptKey) {
-		return
-	}
-
-	admin, err := ac.adminRepository.FindByEmail(credentials.Email)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			ac.recordAuthFailure(attemptKey)
-			apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
-			return
-		}
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
-		return
-	}
-
-	if err := utils.VerifyPassword(admin.Password, credentials.Password); err != nil {
-		ac.recordAuthFailure(attemptKey)
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
-		return
-	}
-	ac.resetAuthFailures(attemptKey)
-
-	// Generate Tokens
-	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
-	if err != nil {
-		apiutil.ApiResponseInternalServerError(c, err)
-		return // Return an error if parsing fails
-	}
-	accessToken, err := utils.CreateToken(duration, admin.Id, "admin", configs.Config.AccessTokenPrivateKey)
-	if err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
-		return
-	}
-
-	resp := models.FilteredAdminResponse(admin)
-	resp.AccessToken = accessToken
 
 	apiutil.ApiResponseOk(c, resp)
 }

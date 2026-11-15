@@ -57,18 +57,6 @@ func (f *fakeLoginUserRepository) FindByEmail(email string) (*models.User, error
 	return nil, mongo.ErrNoDocuments
 }
 
-type fakeLoginAdminRepository struct {
-	repositories.AdminRepository
-	admin *models.Admin
-}
-
-func (f *fakeLoginAdminRepository) FindByEmail(email string) (*models.Admin, error) {
-	if f.admin != nil && f.admin.Email == email {
-		return f.admin, nil
-	}
-	return nil, mongo.ErrNoDocuments
-}
-
 func postLogin(handler gin.HandlerFunc, body string) *httptest.ResponseRecorder {
 	router := gin.New()
 	router.POST("/login", handler)
@@ -166,31 +154,6 @@ func TestSignInUserLock(t *testing.T) {
 			t.Errorf("failures = %d, want 0", got)
 		}
 	})
-}
-
-func TestSignInAdminLock(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	hashed, err := utils.HashPassword("Correct-password-1")
-	if err != nil {
-		t.Fatalf("hash password: %v", err)
-	}
-	attempts := newFakeAuthAttempts()
-	ac := &AuthController{
-		adminRepository:       &fakeLoginAdminRepository{admin: &models.Admin{Email: "admin@b.com", Password: hashed}},
-		authAttemptRepository: attempts,
-	}
-
-	for i := 0; i < testMaxFailures; i++ {
-		postLogin(ac.SignInAdmin, `{"email":"admin@b.com","password":"wrong"}`)
-	}
-	if got := attempts.failures["login-admin:admin@b.com"]; got != testMaxFailures {
-		t.Errorf("failures = %d, want %d", got, testMaxFailures)
-	}
-	w := postLogin(ac.SignInAdmin, `{"email":"admin@b.com","password":"Correct-password-1"}`)
-	if w.Code != http.StatusTooManyRequests {
-		t.Errorf("status = %d, want 429", w.Code)
-	}
 }
 
 func TestChangePasswordLock(t *testing.T) {

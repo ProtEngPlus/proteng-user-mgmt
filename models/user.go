@@ -40,6 +40,28 @@ func (in RegisterInput) ToUser() User {
 	}
 }
 
+type UpdateUserInput struct {
+	Email    *string `json:"email"`
+	Name     *string `json:"name"`
+	Surname  *string `json:"surname"`
+	UserRole *string `json:"user_role"`
+}
+
+func (in UpdateUserInput) ApplyTo(u *User) {
+	if in.Email != nil {
+		u.Email = *in.Email
+	}
+	if in.Name != nil {
+		u.Name = *in.Name
+	}
+	if in.Surname != nil {
+		u.Surname = *in.Surname
+	}
+	if in.UserRole != nil {
+		u.UserRole = *in.UserRole
+	}
+}
+
 type SignInInput struct {
 	Email    string `json:"email" bson:"email" binding:"required"`
 	Password string `json:"password" bson:"password" binding:"required"`

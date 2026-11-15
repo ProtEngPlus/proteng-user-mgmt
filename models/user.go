@@ -21,6 +21,25 @@ type User struct {
 	PasswordResetTokenExpire     time.Time          `bson:"passwordResetTokenExpire,omitempty" json:"-"`
 }
 
+type RegisterInput struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Name     string `json:"name"`
+	Surname  string `json:"surname"`
+	UserRole string `json:"user_role"`
+}
+
+func (in RegisterInput) ToUser() User {
+	return User{
+		Email:    in.Email,
+		Password: in.Password,
+		Name:     in.Name,
+		Surname:  in.Surname,
+		UserRole: in.UserRole,
+		Role:     []string{"user"},
+	}
+}
+
 type SignInInput struct {
 	Email    string `json:"email" bson:"email" binding:"required"`
 	Password string `json:"password" bson:"password" binding:"required"`

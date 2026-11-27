@@ -1,6 +1,6 @@
 # proteng-user-mgmt
 
-proteng-user-mgmt ดูแลบัญชีของ ProtEngPlus ได้แก่ การสมัครสมาชิก, การยืนยันอีเมล, การ login ที่ออก JWT, การลืมและเปลี่ยนรหัสผ่าน และบัญชี admin นอกจากนี้ยังอ่าน queue `job_status_email_notification` เพื่อส่งอีเมลแจ้งผลของ job service นี้ถูกเรียกจาก [proteng-bff](https://github.com/ProtEngPlus/proteng-bff) เท่านั้น ภาพรวมของระบบอยู่ที่ [manual-guides-2023](https://github.com/ProtEngPlus/manual-guides-2023/blob/main/reference/architecture.md)
+proteng-user-mgmt ดูแลบัญชีของ ProtEngPlus ได้แก่ การสมัครสมาชิก, การยืนยันอีเมล, การ login ที่ออก JWT, และการลืมและเปลี่ยนรหัสผ่าน นอกจากนี้ยังอ่าน queue `job_status_email_notification` เพื่อส่งอีเมลแจ้งผลของ job service นี้ถูกเรียกจาก [proteng-bff](https://github.com/ProtEngPlus/proteng-bff) เท่านั้น ภาพรวมของระบบอยู่ที่ [manual-guides-2023](https://github.com/ProtEngPlus/manual-guides-2023/blob/main/reference/architecture.md)
 
 ## เริ่มใช้
 
@@ -42,7 +42,8 @@ user-mgmt อ่าน `.env.local` เมื่อรันด้วย `ENV=lo
 | `MONGO_URI` | `mongodb://localhost:27017` | MongoDB |
 | `MONGO_DB` | `proteng_local` | ชื่อ database ถ้าไม่ตั้ง ค่า default ในโค้ดคือ `proteng-dev` |
 | `ACCESS_TOKEN_PRIVATE_KEY` | ใส่ด้วย `make -C ../manual-guides-2023 local-keys` | base64 ของ RSA private key แบบ PEM (PKCS1 หรือ PKCS8) ใช้เซ็น JWT |
-| `ACCESS_TOKEN_EXPIRED_IN`, `ACCESS_TOKEN_MAXAGE` | `1h`, `3600` | อายุของ token |
+| `ACCESS_TOKEN_EXPIRED_IN` | `1h` | อายุของ access token |
+| `REFRESH_TOKEN_EXPIRED_IN` | `168h` | อายุของ refresh token |
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT` | `noreply@localhost`, `localhost`, `1025` | ผู้ส่งและ SMTP server ค่า local ชี้ไปที่ Mailhog `SMTP_PORT` ต้องเป็นตัวเลข ถ้าว่าง service จะหยุดตั้งแต่เริ่ม |
 | `SMTP_USER`, `SMTP_PASS` | ว่าง | บัญชี SMTP จริง ใช้เฉพาะ dev และ production |
 | `ORIGIN` | `http://localhost:5173` | URL ของหน้าเว็บ ใช้สร้างลิงก์ในอีเมล เช่นลิงก์ยืนยันและลิงก์ reset password |
@@ -51,8 +52,8 @@ user-mgmt อ่าน `.env.local` เมื่อรันด้วย `ENV=lo
 
 | ที่อยู่ | มีอะไร |
 | --- | --- |
-| `apis/routes/`, `apis/controllers/` | endpoint ของ `/auth/*`, `/users/*` และ `/admins/*` |
-| `models/`, `repositories/` | struct ของ user และ admin และการอ่านเขียน MongoDB `EnsureIndexes` สร้าง unique index ของ email ตอนเริ่ม |
+| `apis/routes/`, `apis/controllers/` | endpoint ของ `/auth/*` และ `/users/*` |
+| `models/`, `repositories/` | struct ของ user และการอ่านเขียน MongoDB `EnsureIndexes` สร้าง unique index ของ email ตอนเริ่ม |
 | `internal/rabbitmq/consumer/` | อ่าน `JOB_QUEUE` แล้วส่งอีเมลแจ้งผลของ job ตามการตั้งค่าของผู้ใช้ |
 | `utils/email.go` | `SendEmail` สร้างอีเมลจาก template แล้วส่งผ่าน SMTP |
 | `utils/token.go`, `utils/password.go` | สร้าง JWT และ hash รหัสผ่าน |

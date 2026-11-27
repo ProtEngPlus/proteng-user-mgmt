@@ -17,6 +17,45 @@ type User struct {
 	IsVerified                   bool               `bson:"is_verified" json:"is_verified"`
 	EmailVerificationToken       string             `bson:"emailVerificationToken,omitempty" json:"-"`
 	EmailVerificationTokenExpire time.Time          `bson:"emailVerificationTokenExpire,omitempty" json:"-"`
+	PasswordResetToken           string             `bson:"passwordResetToken,omitempty" json:"-"`
+	PasswordResetTokenExpire     time.Time          `bson:"passwordResetTokenExpire,omitempty" json:"-"`
+}
+
+type RegisterInput struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Name     string `json:"name"`
+	Surname  string `json:"surname"`
+	UserRole string `json:"user_role"`
+}
+
+func (in RegisterInput) ToUser() User {
+	return User{
+		Email:    in.Email,
+		Password: in.Password,
+		Name:     in.Name,
+		Surname:  in.Surname,
+		UserRole: in.UserRole,
+		Role:     []string{"user"},
+	}
+}
+
+type UpdateUserInput struct {
+	Name     *string `json:"name"`
+	Surname  *string `json:"surname"`
+	UserRole *string `json:"user_role"`
+}
+
+func (in UpdateUserInput) ApplyTo(u *User) {
+	if in.Name != nil {
+		u.Name = *in.Name
+	}
+	if in.Surname != nil {
+		u.Surname = *in.Surname
+	}
+	if in.UserRole != nil {
+		u.UserRole = *in.UserRole
+	}
 }
 
 type SignInInput struct {
@@ -26,15 +65,16 @@ type SignInInput struct {
 }
 
 type UserResponse struct {
-	ID          primitive.ObjectID `json:"id"`
-	Email       string             `json:"email"`
-	Name        string             `json:"name"`
-	Role        []string           `json:"role"`
-	UserRole    string             `json:"user_role"`
-	Surname     string             `json:"surname"`
-	AccessToken string             `json:"access_token,omitempty"`
-	CurrentRole string             `json:"current_role,omitempty"`
-	IsVerified  bool               `json:"is_verified"`
+	ID           primitive.ObjectID `json:"id"`
+	Email        string             `json:"email"`
+	Name         string             `json:"name"`
+	Role         []string           `json:"role"`
+	UserRole     string             `json:"user_role"`
+	Surname      string             `json:"surname"`
+	AccessToken  string             `json:"access_token,omitempty"`
+	RefreshToken string             `json:"refresh_token,omitempty"`
+	CurrentRole  string             `json:"current_role,omitempty"`
+	IsVerified   bool               `json:"is_verified"`
 }
 
 func FilteredResponse(user *User) UserResponse {
@@ -63,4 +103,13 @@ type ChangePasswordInput struct {
 }
 type SendVerificationInput struct {
 	Email string `json:"email" binding:"required"`
+}
+
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type SessionTokensResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }

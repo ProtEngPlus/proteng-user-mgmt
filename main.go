@@ -32,13 +32,17 @@ func main() {
 	}
 
 	userRepository := repositories.NewUserRepository()
-	adminRepository := repositories.NewAdminRepository()
+	refreshTokenRepository := repositories.NewRefreshTokenRepository()
+	authAttemptRepository := repositories.NewAuthAttemptRepository()
 
 	if err := userRepository.EnsureIndexes(); err != nil {
 		logger.Zap.Error("failed to ensure user email index", zap.Error(err))
 	}
-	if err := adminRepository.EnsureIndexes(); err != nil {
-		logger.Zap.Error("failed to ensure admin email index", zap.Error(err))
+	if err := refreshTokenRepository.EnsureIndexes(); err != nil {
+		logger.Zap.Error("failed to ensure refresh token indexes", zap.Error(err))
+	}
+	if err := authAttemptRepository.EnsureIndexes(); err != nil {
+		logger.Zap.Error("failed to ensure auth attempt indexes", zap.Error(err))
 	}
 
 	temp := template.Must(template.ParseGlob("templates/*.html"))
@@ -68,8 +72,7 @@ func main() {
 
 	// routes
 	routes.UserRoute(router, userRepository)
-	routes.AuthRoute(router, userRepository, adminRepository, temp)
-	routes.AdminRoute(router, adminRepository)
+	routes.AuthRoute(router, userRepository, refreshTokenRepository, authAttemptRepository, temp)
 
 	// panic recovery
 	router.Use(ginzap.RecoveryWithZap(logger.Zap, true))

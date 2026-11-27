@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thanhpk/randstr"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,24 +26,29 @@ import (
 )
 
 type AuthController struct {
-	userRepository  repositories.UserRepository
-	adminRepository repositories.AdminRepository
-	collection      *mongo.Collection
-	temp            *template.Template
+	userRepository         repositories.UserRepository
+	refreshTokenRepository repositories.RefreshTokenRepository
+	authAttemptRepository  repositories.AuthAttemptRepository
+	collection             *mongo.Collection
+	temp                   *template.Template
 }
 
-func NewAuthController(userRepository repositories.UserRepository, adminRepository repositories.AdminRepository, temp *template.Template) *AuthController {
+func NewAuthController(userRepository repositories.UserRepository, refreshTokenRepository repositories.RefreshTokenRepository, authAttemptRepository repositories.AuthAttemptRepository, temp *template.Template) *AuthController {
 	return &AuthController{
-		userRepository:  userRepository,
-		adminRepository: adminRepository,
-		collection:      database.GetCollection("users"),
-		temp:            temp,
+		userRepository:         userRepository,
+		refreshTokenRepository: refreshTokenRepository,
+		authAttemptRepository:  authAttemptRepository,
+		collection:             database.GetCollection("users"),
+		temp:                   temp,
 	}
 }
 
 const verificationTokenDaysTTL = 7
 const passwordResetTokenMinutesTTL = 15
 const verificationResendCooldown = 60 * time.Second
+const passwordResetResendCooldown = 60 * time.Second
+
+var errPasswordResetFailed = errors.New("could not send password reset email")
 
 func verificationResendWait(tokenExpire, now time.Time) time.Duration {
 	lastSent := tokenExpire.Add(-verificationTokenDaysTTL * 24 * time.Hour)
@@ -53,11 +59,12 @@ func verificationResendWait(tokenExpire, now time.Time) time.Duration {
 }
 
 func (ac *AuthController) RegisterUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var in models.RegisterInput
+	if err := c.ShouldBindJSON(&in); err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
 		return
 	}
+	user := in.ToUser()
 
 	// Validate Password
 	if err := utils.ValidatePasswordStrength(user.Password); err != nil {
@@ -94,6 +101,44 @@ func (ac *AuthController) RegisterUser(c *gin.Context) {
 	apiutil.ApiResponseOk(c, models.FilteredResponse(&user), "Verification email sent")
 }
 
+func passwordResetResendWait(tokenExpire, now time.Time) time.Duration {
+	lastSent := tokenExpire.Add(-passwordResetTokenMinutesTTL * time.Minute)
+	if wait := passwordResetResendCooldown - now.Sub(lastSent); wait > 0 {
+		return wait
+	}
+	return 0
+}
+
+func authRetryAfterSeconds(wait time.Duration) int {
+	return int(math.Ceil(wait.Seconds()))
+}
+
+func (ac *AuthController) authLocked(c *gin.Context, key string) bool {
+	wait, err := ac.authAttemptRepository.Wait(key, time.Now())
+	if err != nil {
+		logger.Errorf("Failed to check auth attempts: %v", err)
+		apiutil.ApiResponseInternalServerError(c, errors.New("could not check auth attempts"))
+		return true
+	}
+	if wait > 0 {
+		apiutil.ApiResponseTooManyRequests(c, authRetryAfterSeconds(wait), "error: too many failed attempts")
+		return true
+	}
+	return false
+}
+
+func (ac *AuthController) recordAuthFailure(key string) {
+	if err := ac.authAttemptRepository.RecordFailure(key, time.Now()); err != nil {
+		logger.Errorf("Failed to record auth failure: %v", err)
+	}
+}
+
+func (ac *AuthController) resetAuthFailures(key string) {
+	if err := ac.authAttemptRepository.Reset(key); err != nil {
+		logger.Errorf("Failed to reset auth failures: %v", err)
+	}
+}
+
 func (ac *AuthController) SignInUser(c *gin.Context) {
 	var credentials *models.SignInInput
 
@@ -102,9 +147,15 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 		return
 	}
 
+	attemptKey := "login:" + utils.NormalizeEmail(credentials.Email)
+	if ac.authLocked(c, attemptKey) {
+		return
+	}
+
 	user, err := ac.userRepository.FindByEmail(credentials.Email)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
+			ac.recordAuthFailure(attemptKey)
 			apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 			return
 		}
@@ -114,93 +165,28 @@ func (ac *AuthController) SignInUser(c *gin.Context) {
 
 	if !slices.Contains(user.Role, credentials.Role) {
 		err := errors.New("invalid role")
+		ac.recordAuthFailure(attemptKey)
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
 
 	if err := utils.VerifyPassword(user.Password, credentials.Password); err != nil {
+		ac.recordAuthFailure(attemptKey)
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
 		return
 	}
+	ac.resetAuthFailures(attemptKey)
 
-	if !user.IsVerified {
-		err := errors.New("email not verified")
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: email not verified")
-		return
-	}
-
-	// Generate Tokens
-	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
+	session, err := ac.issueSession(user.Id, credentials.Role, primitive.NewObjectID())
 	if err != nil {
 		apiutil.ApiResponseInternalServerError(c, err)
-		return // Return an error if parsing fails
-	}
-	accessToken, err := utils.CreateToken(duration, user.Id, credentials.Role, configs.Config.AccessTokenPrivateKey)
-	if err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
-
-	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
-	// if err != nil {
-	// 	apiutil.ApiResponseInternalServerError(c, err)
-	// 	return
-	// }
-	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
 
 	resp := models.FilteredResponse(user)
-	resp.AccessToken = accessToken
+	resp.AccessToken = session.AccessToken
+	resp.RefreshToken = session.RefreshToken
 	resp.CurrentRole = credentials.Role
-
-	apiutil.ApiResponseOk(c, resp)
-}
-
-func (ac *AuthController) SignInAdmin(c *gin.Context) {
-	var credentials *models.SignInAdminInput
-
-	if err := c.ShouldBindJSON(&credentials); err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
-		return
-	}
-
-	admin, err := ac.adminRepository.FindByEmail(credentials.Email)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
-			return
-		}
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid credential")
-		return
-	}
-
-	if err := utils.VerifyPassword(admin.Password, credentials.Password); err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid email or password")
-		return
-	}
-
-	// Generate Tokens
-	duration, err := time.ParseDuration(configs.Config.AccessTokenExpiredIn)
-	if err != nil {
-		apiutil.ApiResponseInternalServerError(c, err)
-		return // Return an error if parsing fails
-	}
-	accessToken, err := utils.CreateToken(duration, admin.Id, "admin", configs.Config.AccessTokenPrivateKey)
-	if err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
-		return
-	}
-
-	// maxAge, err := strconv.Atoi(configs.Config.AccessTokenMaxAge)
-	// if err != nil {
-	// 	apiutil.ApiResponseInternalServerError(c, err)
-	// 	return
-	// }
-	// c.SetCookie("access_token", accessToken, maxAge*60, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "true", maxAge*60, "/", "localhost", false, false)
-
-	resp := models.FilteredAdminResponse(admin)
-	resp.AccessToken = accessToken
 
 	apiutil.ApiResponseOk(c, resp)
 }
@@ -221,20 +207,25 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 			apiutil.ApiResponseOk(c, userCredential, message)
 			return
 		}
-		apiutil.ApiResponseBadGateway(c, err)
+		logger.Errorf("Failed to look up user for password reset: %v", err)
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
 		return
 	}
 
 	if !user.IsVerified {
-		err := errors.New("email not verified")
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: email not verified")
+		apiutil.ApiResponseOk(c, userCredential, message)
+		return
+	}
+
+	if passwordResetResendWait(user.PasswordResetTokenExpire, time.Now()) > 0 {
+		apiutil.ApiResponseOk(c, userCredential, message)
 		return
 	}
 
 	// Generate Verification Code
 	resetToken := randstr.String(20)
 
-	passwordResetToken := utils.Encode(resetToken)
+	passwordResetToken := utils.HashResetToken(resetToken)
 
 	// Update User in Database
 	query := bson.D{{Key: "email", Value: utils.NormalizeEmail(userCredential.Email)}}
@@ -252,16 +243,17 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 		}}}
 
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
+	if err != nil {
+		logger.Errorf("Failed to store password reset token: %v", err)
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
+		return
+	}
 
 	if result.MatchedCount == 0 {
-		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
 		return
 	}
 
-	if err != nil {
-		apiutil.ApiResponseForbidden(c, err)
-		return
-	}
 	// Send Email
 	emailData := utils.EmailData{
 		URL:           configs.Config.Origin + "/reset-password?token=" + resetToken,
@@ -272,10 +264,42 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 
 	err = utils.SendEmail(user, &emailData, ac.temp, "resetPassword.html")
 	if err != nil {
-		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
+		logger.Errorf("Failed to send password reset email: %v", err)
+		clear := bson.D{{Key: "$unset", Value: bson.D{{Key: "passwordResetToken", Value: ""}, {Key: "passwordResetTokenExpire", Value: ""}}}}
+		if _, clearErr := ac.collection.UpdateOne(context.Background(), query, clear); clearErr != nil {
+			logger.Errorf("Failed to clear password reset token: %v", clearErr)
+		}
+		apiutil.ApiResponseBadGateway(c, errPasswordResetFailed, "There was an error sending email")
 		return
 	}
+
 	apiutil.ApiResponseOk(c, userCredential, message)
+}
+
+func passwordResetTokenQuery(resetToken string, now time.Time) bson.D {
+	return bson.D{
+		{Key: "passwordResetToken", Value: utils.HashResetToken(resetToken)},
+		{Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: now}}},
+	}
+}
+
+func (ac *AuthController) CheckResetToken(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), database.QueryTimeout)
+	defer cancel()
+
+	query := passwordResetTokenQuery(c.Params.ByName("resetToken"), time.Now())
+	count, err := ac.collection.CountDocuments(ctx, query, options.Count().SetLimit(1))
+	if err != nil {
+		logger.Errorf("Failed to check password reset token: %v", err)
+		apiutil.ApiResponseInternalServerError(c, errors.New("could not check token"))
+		return
+	}
+	if count == 0 {
+		apiutil.ApiResponseErrorBadRequest(c, fmt.Errorf("invalid token"), "Token is invalid or has expired")
+		return
+	}
+
+	apiutil.ApiResponseOk(c, nil, "Token is valid")
 }
 
 func (ac *AuthController) ResetPassword(c *gin.Context) {
@@ -295,10 +319,8 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 
 	hashedPassword, _ := utils.HashPassword(userCredential.Password)
 
-	passwordResetToken := utils.Encode(resetToken)
-
 	// Update User in Database
-	query := bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetTokenExpire", Value: bson.D{{Key: "$gt", Value: time.Now()}}}}
+	query := passwordResetTokenQuery(resetToken, time.Now())
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}, {Key: "$unset", Value: bson.D{{Key: "passwordResetToken", Value: ""}, {Key: "passwordResetTokenExpire", Value: ""}}}}
 
 	var user models.User
@@ -315,9 +337,9 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// c.SetCookie("access_token", "", -1, "/", "localhost", false, true)
-	// c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
-	// c.SetCookie("logged_in", "", -1, "/", "localhost", false, true)
+	if err := ac.refreshTokenRepository.RevokeAllForSubject(user.Id, time.Now()); err != nil {
+		logger.Errorf("Failed to revoke sessions after password reset for user %s: %v", user.Id.Hex(), err)
+	}
 
 	emailData := utils.EmailData{
 		FirstName: user.Name,
@@ -343,8 +365,14 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		return
 	}
 
+	attemptKey := "change-password:" + user.Id.Hex()
+	if ac.authLocked(c, attemptKey) {
+		return
+	}
+
 	// Validate Current Password
 	if err := utils.VerifyPassword(user.Password, userCredential.CurrentPassword); err != nil {
+		ac.recordAuthFailure(attemptKey)
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: incorrect current password")
 		return
 	}
@@ -365,15 +393,19 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	defer cancel()
 
 	result, err := ac.collection.UpdateOne(ctx, query, update)
-
-	if result.MatchedCount == 0 {
-		apiutil.ApiResponseErrorBadRequest(c, err, "Cannot update password")
-		return
-	}
-
 	if err != nil {
 		apiutil.ApiResponseForbidden(c, err)
 		return
+	}
+
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseErrorBadRequest(c, errors.New("user not found"), "Cannot update password")
+		return
+	}
+
+	ac.resetAuthFailures(attemptKey)
+	if err := ac.refreshTokenRepository.RevokeAllForSubject(user.Id, time.Now()); err != nil {
+		logger.Errorf("Failed to revoke sessions after password change for user %s: %v", user.Id.Hex(), err)
 	}
 
 	emailData := utils.EmailData{
@@ -435,16 +467,16 @@ func (ac *AuthController) SendVerification(c *gin.Context) {
 			},
 		}}}
 	result, err := ac.collection.UpdateOne(context.Background(), query, update)
-
-	if result.MatchedCount == 0 {
-		apiutil.ApiResponseBadGateway(c, err, "There was an error sending email")
-		return
-	}
-
 	if err != nil {
 		apiutil.ApiResponseForbidden(c, err)
 		return
 	}
+
+	if result.MatchedCount == 0 {
+		apiutil.ApiResponseBadGateway(c, errors.New("user not found"), "There was an error sending email")
+		return
+	}
+
 	// Send Email
 	emailData := utils.EmailData{
 		URL:        configs.Config.Origin + "/success-verified?token=" + verificationToken,
@@ -492,22 +524,15 @@ func (ac *AuthController) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	// Generate Tokens
-	var duration time.Duration
-	duration, err = time.ParseDuration(configs.Config.AccessTokenExpiredIn)
-
+	session, err := ac.issueSession(user.Id, "user", primitive.NewObjectID())
 	if err != nil {
 		apiutil.ApiResponseInternalServerError(c, err)
-		return // Return an error if parsing fails
-	}
-	accessToken, err := utils.CreateToken(duration, user.Id, "user", configs.Config.AccessTokenPrivateKey)
-	if err != nil {
-		apiutil.ApiResponseErrorBadRequest(c, err, "error: cannot create token")
 		return
 	}
 
 	resp := models.FilteredResponse(&user)
-	resp.AccessToken = accessToken
+	resp.AccessToken = session.AccessToken
+	resp.RefreshToken = session.RefreshToken
 	resp.CurrentRole = "user"
 
 	apiutil.ApiResponseOk(c, resp, "Email verified successfully")

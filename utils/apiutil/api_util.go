@@ -53,6 +53,17 @@ func ApiResponseNotFound(c *gin.Context, err error, messages ...string) {
 	})
 }
 
+func ApiResponseUnauthorized(c *gin.Context, err error, messages ...string) {
+	if len(messages) == 0 {
+		messages = append(messages, "")
+	}
+	c.AbortWithStatusJSON(http.StatusUnauthorized, models.HttpResponseError{
+		Code:    http.StatusUnauthorized,
+		Error:   err.Error(),
+		Message: messages[0],
+	})
+}
+
 func ApiResponseForbidden(c *gin.Context, err error, messages ...string) {
 	if len(messages) == 0 {
 		messages = append(messages, "")

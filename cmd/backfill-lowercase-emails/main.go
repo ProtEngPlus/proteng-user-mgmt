@@ -16,7 +16,7 @@ import (
 
 func main() {
 	logger.InitZap()
-	collectionFlag := flag.String("collection", "all", "which collection to backfill: users, admins, or all")
+	collectionFlag := flag.String("collection", "all", "which collection to backfill: users or all")
 	dryRun := flag.Bool("dry-run", true, "if true, only print planned changes without writing")
 	flag.Parse()
 
@@ -28,14 +28,10 @@ func main() {
 
 	var collections []string
 	switch *collectionFlag {
-	case "users":
+	case "users", "all":
 		collections = []string{"users"}
-	case "admins":
-		collections = []string{"admins"}
-	case "all":
-		collections = []string{"users", "admins"}
 	default:
-		fmt.Fprintf(os.Stderr, "invalid -collection value: %s (must be users, admins, or all)\n", *collectionFlag)
+		fmt.Fprintf(os.Stderr, "invalid -collection value: %s (must be users or all)\n", *collectionFlag)
 		os.Exit(1)
 	}
 

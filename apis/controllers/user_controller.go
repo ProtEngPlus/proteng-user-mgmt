@@ -16,23 +16,6 @@ func NewUserController(userRepository repositories.UserRepository) *UserControll
 	return &UserController{userRepository: userRepository}
 }
 
-// GetAllUsers retrieves all users
-func (uc *UserController) GetAllUsers(c *gin.Context) {
-	users, err := uc.userRepository.GetAll()
-	if err != nil {
-		apiutil.ApiResponseInternalServerError(c, err)
-		return
-	}
-
-	// Transform each user using FilteredResponse function
-	var filteredUsers []models.UserResponse
-	for _, user := range users {
-		filteredUsers = append(filteredUsers, models.FilteredResponse(user))
-	}
-
-	apiutil.ApiResponseOk(c, filteredUsers)
-}
-
 // GetUser retrieves a user by ID
 func (uc *UserController) GetUser(c *gin.Context) {
 	id := c.Param("id")
@@ -53,11 +36,13 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 		apiutil.ApiResponseNotFound(c, err)
 		return
 	}
-	err = c.BindJSON(&user)
-	if err != nil {
+
+	var in models.UpdateUserInput
+	if err := c.ShouldBindJSON(&in); err != nil {
 		apiutil.ApiResponseErrorBadRequest(c, err, "error: invalid request body")
 		return
 	}
+	in.ApplyTo(user)
 
 	err = uc.userRepository.Update(id, user)
 	if err != nil {
